@@ -17,7 +17,7 @@
 
 #include <fstream>
 #include <fcntl.h>
-
+#include <unistd.h>
 
 using namespace CVD;
 using namespace std;
