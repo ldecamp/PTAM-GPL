@@ -1,3 +1,4 @@
 #ignore object files and bin folder
 bin
 *.o
+bin/camera.cfg

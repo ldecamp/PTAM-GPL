@@ -47,6 +47,7 @@ PTAM: $(OBJECTS)
 
 CameraCalibrator:$(CALIB_OBJECTS)
 	$(CC) -o $(BINOUTPUT)/CameraCalibrator $(CALIB_OBJECTS) $(LINKFLAGS)
+	cp calibrator_settings.cfg bin/calibrator_settings.cfg
 
 
 %.o: %.cc
