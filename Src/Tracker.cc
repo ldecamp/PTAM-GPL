@@ -40,7 +40,7 @@ Tracker::Tracker(ImageRef irVideoSize, const ATANCamera &c, Map &m, MapMaker &mm
 
   mpSBILastFrame = NULL;
   mpSBIThisFrame = NULL;
-
+  mnFrameTotal=0;
   // Most of the initialisation is done in Reset()
   Reset();
 }
@@ -92,6 +92,7 @@ void Tracker::TrackFrame(Image<byte> &imFrame, bool bDraw)
   // This does things like generate the image pyramid and find FAST corners
   mCurrentKF.mMeasurements.clear();
   mCurrentKF.MakeKeyFrame_Lite(imFrame);
+  mCurrentKF.mbKFId = mnFrameTotal; // Set frame id for stats
 
   // Update the small images for the rotation estimator
   static gvar3<double> gvdSBIBlur("Tracker.RotationEstimatorBlur", 0.75, SILENT);
@@ -111,7 +112,7 @@ void Tracker::TrackFrame(Image<byte> &imFrame, bool bDraw)
   
   // From now on we only use the keyframe struct!
   mnFrame++;
-  
+  mnFrameTotal++; //increment total number of frame processed (only for stats)
   if(mbDraw)
     {
       glDrawPixels(mCurrentKF.aLevels[0].im);

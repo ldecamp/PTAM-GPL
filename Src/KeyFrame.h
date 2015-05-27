@@ -91,6 +91,8 @@ struct KeyFrame
   double dSceneDepthSigma;
   
   SmallBlurryImage *pSBI; // The relocaliser uses this
+
+  int mbKFId; // Save the index of the frame in video (needed for stats)
 };
 
 typedef std::map<MapPoint*, Measurement>::iterator meas_it;  // For convenience, and to work around an emacs paren-matching bug

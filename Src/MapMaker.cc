@@ -5,6 +5,7 @@
 #include "PatchFinder.h"
 #include "SmallMatrixOpts.h"
 #include "HomographyInit.h"
+#include "Statistics.h"
 
 #include <cvd/vector_image_ref.h>
 #include <cvd/vision.h>
@@ -70,6 +71,8 @@ void MapMaker::run()
 
   while(!shouldStop())  // ShouldStop is a CVD::Thread func which return true if the thread is told to exit.
     {
+      bool updateStats=false;
+
       CHECK_RESET;
       sleep(5); // Sleep not really necessary, especially if mapmaker is busy
       CHECK_RESET;
@@ -90,20 +93,26 @@ void MapMaker::run()
       
       CHECK_RESET;
       // Should we run local bundle adjustment?
-      if(!mbBundleConverged_Recent && QueueSize() == 0)  
-	BundleAdjustRecent();   
+      if(!mbBundleConverged_Recent && QueueSize() == 0)  {
+        BundleAdjustRecent();
+        updateStats=true;
+      }   
       
       CHECK_RESET;
       // Are there any newly-made map points which need more measurements from older key-frames?
-      if(mbBundleConverged_Recent && QueueSize() == 0)
-	ReFindNewlyMade();  
+      if(mbBundleConverged_Recent && QueueSize() == 0){
+        ReFindNewlyMade();
+        updateStats=true;
+      }  
       
       CHECK_RESET;
 
 
       // Run global bundle adjustment?
-      if(*mgvdEnableGlobalBA && mbBundleConverged_Recent && !mbBundleConverged_Full && QueueSize() == 0)
+      if(*mgvdEnableGlobalBA && mbBundleConverged_Recent && !mbBundleConverged_Full && QueueSize() == 0){
         BundleAdjustAll();
+        updateStats=true;
+      }
       
       CHECK_RESET;
       // Very low priorty: re-find measurements marked as outliers
@@ -115,8 +124,27 @@ void MapMaker::run()
       
       CHECK_RESET;
       // Any new key-frames to be added?
-      if(QueueSize() > 0)
-	AddKeyFrameFromTopOfQueue(); // Integrate into map data struct, and process
+      if(QueueSize() > 0) {
+        AddKeyFrameFromTopOfQueue();
+        updateStats=true;
+      } // Integrate into map data struct, and process
+
+      if(updateStats){
+        std::vector<std::vector<double> > estimates;
+        for(unsigned int i=0; i<mMap.vpKeyFrames.size(); i++){
+            SE3<> kfse3CamW=mMap.vpKeyFrames[i]->se3CfromW; //extract coordinate of keyframe
+            Vector<3> kfW = kfse3CamW.inverse().get_translation().slice<0,3>(); //convert to world coordinate
+            //Append coordinates to list.
+            std::vector<double> kfWc;
+            kfWc.push_back((double)mMap.vpKeyFrames[i]->mbKFId);
+            kfWc.push_back((double)kfW[0]);
+            kfWc.push_back((double)kfW[1]);
+            kfWc.push_back((double)kfW[2]);
+            kfWc.push_back(mMap.vpKeyFrames[i]->dSceneDepthMean);
+            estimates.push_back(kfWc);
+        }
+        Stats::SetPosesEstimates(estimates);
+      }
     }
 }
 
@@ -322,6 +350,7 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
   RefreshSceneDepth(pkSecond);
   mdWiggleScaleDepthNormalized = mdWiggleScale / pkFirst->dSceneDepthMean;
 
+  Stats::SetScale((double)mdWiggleScaleDepthNormalized); //Update Scene scale
 
   AddSomeMapPoints(0);
   AddSomeMapPoints(3);

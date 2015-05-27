@@ -8,6 +8,7 @@
 #include "Tracker.h"
 #include "ARDriver.h"
 #include "MapViewer.h"
+#include "Statistics.h"
 
 using namespace CVD;
 using namespace std;
@@ -104,6 +105,12 @@ void System::Run()
       mGLWindow.DrawMenus();
       mGLWindow.swap_buffers();
       mGLWindow.HandlePendingEvents();
+    }
+
+    static gvar3<bool> gvnSaveStats("Stats.Save", false, HIDDEN|SILENT);
+    if(*gvnSaveStats){
+      std::cout << "Saving statistics..." << std::endl;
+      Stats::SaveStats();
     }
 }
 

@@ -54,7 +54,6 @@ public:
   
 protected:
   KeyFrame mCurrentKF;            // The current working frame as a keyframe struct
-  
   // The major components to which the tracker needs access:
   Map &mMap;                      // The map, consisting of points and keyframes
   MapMaker &mMapMaker;            // The class which maintains the map
@@ -98,6 +97,7 @@ protected:
   bool mbDraw;                    // Should the tracker draw anything to OpenGL?
   
   // Interface with map maker:
+  int mnFrameTotal;               // Track the total number of frame processed (get id of frame in video)
   int mnFrame;                    // Frames processed since last reset
   int mnLastKeyFrameDropped;      // Counter of last keyframe inserted.
   void AddNewKeyFrame();          // Gives the current frame to the mapmaker to use as a keyframe
