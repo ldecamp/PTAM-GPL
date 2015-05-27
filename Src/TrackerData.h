@@ -106,11 +106,6 @@ TrackerData(MapPoint *pMapPoint)
   static CVD::ImageRef irImageSize;
 };
 
-
-
-
-
-
 #endif
 
 

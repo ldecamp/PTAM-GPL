@@ -36,6 +36,7 @@ MapMaker::MapMaker(Map& m, const ATANCamera &cam)
   start(); // This CVD::thread func starts the map-maker thread with function run()
   GUI.RegisterCommand("SaveMap", GUICommandCallBack, this);
   GV3::Register(mgvdWiggleScale, "MapMaker.WiggleScale", 0.1, SILENT); // Default to 10cm between keyframes
+  GV3::Register(mgvdEnableGlobalBA, "MapMaker.EnableGlobalBA", true, SILENT); // default enable global BA
 };
 
 void MapMaker::Reset()
@@ -98,9 +99,11 @@ void MapMaker::run()
 	ReFindNewlyMade();  
       
       CHECK_RESET;
+
+
       // Run global bundle adjustment?
-      if(mbBundleConverged_Recent && !mbBundleConverged_Full && QueueSize() == 0)
-	BundleAdjustAll();
+      if(*mgvdEnableGlobalBA && mbBundleConverged_Recent && !mbBundleConverged_Full && QueueSize() == 0)
+        BundleAdjustAll();
       
       CHECK_RESET;
       // Very low priorty: re-find measurements marked as outliers
@@ -690,7 +693,7 @@ bool MapMaker::NeedNewKeyFrame(KeyFrame &kCurrent)
 {
   KeyFrame *pClosest = ClosestKeyFrame(kCurrent);
   double dDist = KeyFrameLinearDist(kCurrent, *pClosest);
-  dDist *= (1.0 / kCurrent.dSceneDepthMean);
+  // dDist *= (1.0 / kCurrent.dSceneDepthMean);
   
   if(dDist > GV2.GetDouble("MapMaker.MaxKFDistWiggleMult",1.0,SILENT) * mdWiggleScaleDepthNormalized)
     return true;

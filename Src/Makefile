@@ -6,6 +6,7 @@ COMPILEFLAGS =  -D_LINUX -D_REENTRANT -Wall  -O3 -march=nocona -msse3 `pkg-confi
 LINKFLAGS =  -lGVars3 -lcvd -llapack -lGL -lGLU -lglut `pkg-config opencv --libs` 
 
 BINOUTPUT="bin"
+CAMERASETTINGS="CamSettings/hdcam.cfg"
 # Edit this line to change video source
 #DV or V4L or Gstreamer_File or OpenCV
 VIDEOSOURCE = VideoSource_Linux_OpenCV.o
@@ -44,6 +45,8 @@ All: PTAM CameraCalibrator
 
 PTAM: $(OBJECTS)
 	$(CC) -o $(BINOUTPUT)/PTAM $(OBJECTS) $(LINKFLAGS)
+	#Merge config files to output
+	cat global_settings.cfg $(CAMERASETTINGS) > $(BINOUTPUT)/settings.cfg
 
 CameraCalibrator:$(CALIB_OBJECTS)
 	$(CC) -o $(BINOUTPUT)/CameraCalibrator $(CALIB_OBJECTS) $(LINKFLAGS)

@@ -9,6 +9,8 @@ using namespace CVD;
 using namespace std;
 using namespace GVars3;
 
+//TODO: Change keyframe structure to cope with new descriptors
+
 void KeyFrame::MakeKeyFrame_Lite(BasicImage<byte> &im)
 {
   // Perpares a Keyframe from an image. Generates pyramid levels, does FAST detection, etc.
@@ -120,10 +122,10 @@ struct LevelHelpersFiller // Code which should be initialised on init goes here;
   {
     for(int i=0; i<LEVELS; i++)
       {
-	if(i==0)  gavLevelColors[i] = makeVector( 1.0, 0.0, 0.0);
-	else if(i==1)  gavLevelColors[i] = makeVector( 1.0, 1.0, 0.0);
-	else if(i==2)  gavLevelColors[i] = makeVector( 0.0, 1.0, 0.0);
-	else if(i==3)  gavLevelColors[i] = makeVector( 0.0, 0.0, 0.7);
+	if(i==0)  gavLevelColors[i] = makeVector( 1.0, 0.0, 0.0); //Red
+	else if(i==1)  gavLevelColors[i] = makeVector( 1.0, 1.0, 0.0); //Yellow
+	else if(i==2)  gavLevelColors[i] = makeVector( 0.0, 1.0, 0.0); // Green
+	else if(i==3)  gavLevelColors[i] = makeVector( 0.0, 0.0, 0.7); // Blue
 	else gavLevelColors[i] =  makeVector( 1.0, 1.0, 0.7); // In case I ever run with LEVELS > 4
       }
   }

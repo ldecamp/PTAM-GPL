@@ -148,11 +148,14 @@ void Tracker::TrackFrame(Image<byte> &imFrame, bool bDraw)
 	    mMessageForUser << " Map: " << mMap.vpPoints.size() << "P, " << mMap.vpKeyFrames.size() << "KF";
 	  }
 	  
+    static gvar3<int> gvdKfDist("Tracker.MinKeyframeDist", 20, SILENT);
+    static gvar3<int> gvdQueueSize("Tracker.QueueSize", 3, SILENT);
+
 	  // Heuristics to check if a key-frame should be added to the map:
 	  if(mTrackingQuality == GOOD &&
 	     mMapMaker.NeedNewKeyFrame(mCurrentKF) &&
-	     mnFrame - mnLastKeyFrameDropped > 20  &&
-	     mMapMaker.QueueSize() < 3)
+	     mnFrame - mnLastKeyFrameDropped > *gvdKfDist  &&
+	     mMapMaker.QueueSize() < *gvdQueueSize)
 	    {
 	      mMessageForUser << " Adding key-frame.";
 	      AddNewKeyFrame();
@@ -591,10 +594,12 @@ void Tracker::TrackMap()
   
   // So, at this stage, we may or may not have done a coarse tracking stage.
   // Now do the fine tracking stage. This needs many more points!
-  
-  int nFineRange = 10;  // Pixel search range for the fine stage. 
+  static gvar3<int> gvdFineRange("Tracker.SearchRangeFine", 10, SILENT);  // Pixel search range for the fine stage.
+  static gvar3<int> gvdFineRangeAndCoarse("Tracker.SearchRangeFineAndCoarse", 5, SILENT);   // Can use a tighter search if the coarse stage was already done.
+
+  int nFineRange = *gvdFineRange;  // Pixel search range for the fine stage. 
   if(mbDidCoarse)       // Can use a tighter search if the coarse stage was already done.
-    nFineRange = 5;
+    nFineRange = *gvdFineRangeAndCoarse;
   
   // What patches shall we use this time? The high-level ones are quite important,
   // so do all of these, with sub-pixel refinement.

@@ -128,6 +128,7 @@ protected:
   bool mbBundleRunning;             // Bundle adjustment is running
   bool mbBundleRunningIsRecent;     //    ... and it's a local bundle adjustment.
 
+  GVars3::gvar3<bool> mgvdEnableGlobalBA; //Sets whether apply global BA
   
 };
 
