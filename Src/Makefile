@@ -48,7 +48,7 @@ PTAM: $(OBJECTS)
 	$(CC) -o $(BINOUTPUT)/PTAM $(OBJECTS) $(LINKFLAGS)
 	#Merge config files to output
 	cat global_settings.cfg $(CAMERASETTINGS) > $(BINOUTPUT)/settings.cfg
-	mkdir bin/Statistics
+	mkdir -p bin/Statistics
 
 CameraCalibrator:$(CALIB_OBJECTS)
 	$(CC) -o $(BINOUTPUT)/CameraCalibrator $(CALIB_OBJECTS) $(LINKFLAGS)
