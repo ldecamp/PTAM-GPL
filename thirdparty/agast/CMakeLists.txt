@@ -1,15 +1,25 @@
-cmake_minimum_required(VERSION 2.4.6)
+#######################################
+SET(PROJECT_NAME fast)
+PROJECT(${PROJECT_NAME})
+CMAKE_MINIMUM_REQUIRED (VERSION 2.4.6)
+#SET(CMAKE_VERBOSE_MAKEFILE ON)
 
 file(GLOB AGAST_SOURCE_FILES  "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc")
-
 file(GLOB AGAST_HEADER_FILES  "${CMAKE_CURRENT_SOURCE_DIR}/include/agast/*.h")
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include/agast)
+#build the library
+ADD_LIBRARY(${PROJECT_NAME} SHARED ${AGAST_SOURCE_FILES} ${AGAST_HEADER_FILES})
 
-#build the library dynamic and static versions
-IF(BRISK_BUILD_SHARED)
-    add_library(agast SHARED ${AGAST_SOURCE_FILES} ${AGAST_HEADER_FILES})
-ELSE(BRISK_BUILD_SHARED)
-    add_library(agast_static STATIC ${AGAST_SOURCE_FILES} ${AGAST_HEADER_FILES})
-    target_link_libraries(agast_static ${SPEC_OPENCV_LIBS} )
-ENDIF(BRISK_BUILD_SHARED)
+################################################################################
+# Create the agastConfig.cmake file for other cmake projects.
+GET_TARGET_PROPERTY(FULL_LIBRARY_NAME ${PROJECT_NAME} LOCATION )
+SET(agast_LIBRARIES ${FULL_LIBRARY_NAME} )
+SET(agast_LIBRARY_DIR ${PROJECT_BINARY_DIR} )
+SET(agast_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+CONFIGURE_FILE( ${CMAKE_CURRENT_SOURCE_DIR}/agast.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/agastConfig.cmake @ONLY IMMEDIATE )
+export( PACKAGE agast )
+
+INSTALL(DIRECTORY include/agast DESTINATION ${CMAKE_INSTALL_PREFIX}/include FILES_MATCHING PATTERN "*.h" )
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib )

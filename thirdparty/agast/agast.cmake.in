@@ -1,0 +1,17 @@
+#######################################################
+# Fast source dir
+set( agast_SOURCE_DIR "@CMAKE_CURRENT_SOURCE_DIR@")
+
+#######################################################
+# Fast build dir
+set( agast_DIR "@CMAKE_CURRENT_BINARY_DIR@")
+
+#######################################################
+set( agast_INCLUDE_DIR  "@agast_INCLUDE_DIR@" )
+set( agast_INCLUDE_DIRS "@agast_INCLUDE_DIR@" )
+
+set( agast_LIBRARIES    "@agast_LIBRARIES@" )
+set( agast_LIBRARY      "@agast_LIBRARIES@" )
+
+set( agast_LIBRARY_DIR  "@agast_LIBRARY_DIR@" )
+set( agast_LIBRARY_DIRS "@agast_LIBRARY_DIR@" )

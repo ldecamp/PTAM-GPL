@@ -1,33 +1,21 @@
-/*
-    oast9 - OAST, an optimal corner detector based on the
-            accelerated segment test for a 16 pixel mask
-
-    Copyright (c) 2010, Elmar Mair
-    All rights reserved.
-   
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions are met:
-       * Redistributions of source code must retain the above copyright
-         notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above copyright
-         notice, this list of conditions and the following disclaimer in the
-         documentation and/or other materials provided with the distribution.
-       * Neither the name of the owner nor the names of its contributors may be 
-         used to endorse or promote products derived from this software without 
-         specific prior written permission.
-   
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
-    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
+//
+//    oast9 - OAST, an optimal corner detector based on the
+//              accelerated segment test for a 16 pixel mask
+//
+//    Copyright (C) 2010  Elmar Mair
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License
+//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -39,29 +27,66 @@ using namespace agast;
 
 //using also bisection as propsed by Edward Rosten in FAST,
 //but it is based on the OAST
-int OastDetector9_16::cornerScore(const unsigned char* p)
+int OastDetector9_16::cornerScore(const unsigned char* p, bool ignorePattern)
 {
     int bmin = b;
     //std::cout <<int(b)<<":";
     int bmax = 255;
     int b_test = (bmax + bmin)/2;
 
-	register int_fast16_t offset0=s_offset0;
-	register int_fast16_t offset1=s_offset1;
-	register int_fast16_t offset2=s_offset2;
-	register int_fast16_t offset3=s_offset3;
-	register int_fast16_t offset4=s_offset4;
-	register int_fast16_t offset5=s_offset5;
-	register int_fast16_t offset6=s_offset6;
-	register int_fast16_t offset7=s_offset7;
-	register int_fast16_t offset8=s_offset8;
-	register int_fast16_t offset9=s_offset9;
-	register int_fast16_t offset10=s_offset10;
-	register int_fast16_t offset11=s_offset11;
-	register int_fast16_t offset12=s_offset12;
-	register int_fast16_t offset13=s_offset13;
-	register int_fast16_t offset14=s_offset14;
-	register int_fast16_t offset15=s_offset15;
+	register int_fast16_t offset0;
+	register int_fast16_t offset1;
+	register int_fast16_t offset2;
+	register int_fast16_t offset3;
+	register int_fast16_t offset4;
+	register int_fast16_t offset5;
+	register int_fast16_t offset6;
+	register int_fast16_t offset7;
+	register int_fast16_t offset8;
+	register int_fast16_t offset9;
+	register int_fast16_t offset10;
+	register int_fast16_t offset11;
+	register int_fast16_t offset12;
+	register int_fast16_t offset13;
+	register int_fast16_t offset14;
+	register int_fast16_t offset15;
+
+	if(!ignorePattern){
+		offset0=s_offset0;
+		offset1=s_offset1;
+		offset2=s_offset2;
+		offset3=s_offset3;
+		offset4=s_offset4;
+		offset5=s_offset5;
+		offset6=s_offset6;
+		offset7=s_offset7;
+		offset8=s_offset8;
+		offset9=s_offset9;
+		offset10=s_offset10;
+		offset11=s_offset11;
+		offset12=s_offset12;
+		offset13=s_offset13;
+		offset14=s_offset14;
+		offset15=s_offset15;
+	}
+	else{
+		offset0=1;
+		offset1=2;
+		offset2=3;
+		offset3=4;
+		offset4=5;
+		offset5=6;
+		offset6=7;
+		offset7=8;
+		offset8=9;
+		offset9=10;
+		offset10=11;
+		offset11=12;
+		offset12=13;
+		offset13=14;
+		offset14=15;
+		offset15=16;
+	}
 
 	while(1)
 	{
