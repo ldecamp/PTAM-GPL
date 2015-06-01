@@ -23,7 +23,7 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   std::vector<KeyPoint> keypoints;
   BriskScaleSpace briskScaleSpace(2);
   briskScaleSpace.constructPyramid(im);
-  briskScaleSpace.getKeypoints(5,keypoints);
+  briskScaleSpace.getKeypoints(10,keypoints);
 
   // First, copy out the image data to the pyramid's zero level.
   aLevels[0].im.resize(im.size());
@@ -44,7 +44,8 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
 
   //fill corners
   for(unsigned int i=0;i<keypoints.size();i++){
-    aLevels[keypoints[i].octave].vCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
+    // if(keypoints[i].octave==0)
+      aLevels[keypoints[i].octave].vCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
   }
 
   //add index
@@ -54,7 +55,7 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
     // Generate row look-up-table for the FAST corner points: this speeds up 
     // finding close-by corner points later on.
     unsigned int v=0;
-    for(int y=0; y<lev.im.size().y; y++)
+    for(int y=0; y<=lev.im.size().y; y++)
     {
       while(v < lev.vCorners.size() && y > lev.vCorners[v].y)
         v++;

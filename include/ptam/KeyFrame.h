@@ -80,8 +80,11 @@ struct KeyFrame
   }
   SE3<> se3CfromW;    // The coordinate frame of this key-frame as a Camera-From-World transformation
   bool bFixed;      // Is the coordinate frame of this keyframe fixed? (only true for first KF!)
-  Level aLevels[LEVELS];  // Images, corners, etc lives in this array of pyramid levels
+  
   std::map<MapPoint*, Measurement> mMeasurements;           // All the measurements associated with the keyframe
+  
+  //Replace Levels With Briskscalespace 
+  Level aLevels[LEVELS];  // Images, corners, etc lives in this array of pyramid levels
   
   void MakeKeyFrame_Lite(CVD::Image<CVD::byte> &im);   // This takes an image and calculates pyramid levels etc to fill the 
                                                             // keyframe data structures with everything that's needed by the tracker..

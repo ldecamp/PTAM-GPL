@@ -101,7 +101,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 # PTAM executable
 add_executable(ptam ${PTAM_SOURCE_FILES} ${PTAM_VIDEO_SOURCE_FILES} ${PTAM_HEADER_FILES})
 
-set_property(TARGET ptam APPEND_STRING PROPERTY COMPILE_FLAGS "-D_LINUX -D_REENTRANT -Wall -march=native ")
+set_property(TARGET ptam APPEND_STRING PROPERTY COMPILE_FLAGS "-D_LINUX -D_REENTRANT -g -Wall -march=native ")
 IF(CMAKE_BUILD_TYPE MATCHES Release)
  set_property(TARGET ptam APPEND_STRING PROPERTY COMPILE_FLAGS "-O3 ")
  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsee -funsafe-loop-optimizations -fno-signed-zeros -fno-math-errno -funroll-loops")
