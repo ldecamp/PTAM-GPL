@@ -33,6 +33,7 @@ VideoSource::VideoSource()
 		mptr = new VideoCapture(0);
     }
 	else{
+		//Can change here the resize of the frame if need be
 		OPENCV_VIDEO_W=1920;
 		OPENCV_VIDEO_H=1080;
 		mptr = new VideoCapture(videoSourceFile);
@@ -81,7 +82,9 @@ void VideoSource::GetAndFillFrameBWandRGB(Image<byte> &imBW, Image<Rgb<byte> > &
 	Mat frame;
 	VideoCapture* cap = (VideoCapture*)mptr;
 	*cap >> frame;
-  	conversionNB(frame, imBW);
-  	conversionRGB(frame, imRGB);
+	Mat ftmp;//dst image
+	cv::resize(frame,ftmp,cv::Size(OPENCV_VIDEO_W,OPENCV_VIDEO_H));//resize image
+  	conversionNB(ftmp, imBW);
+  	conversionRGB(ftmp, imRGB);
 }
 

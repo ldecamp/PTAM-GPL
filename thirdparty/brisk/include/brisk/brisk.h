@@ -182,6 +182,10 @@ class BriskScaleSpace
 		// get Keypoints
 		void getKeypoints(const uint8_t _threshold, std::vector<KeyPoint>& keypoints);
 
+		inline std::vector<BriskLayer> getPyramid(){
+			return pyramid_;
+		}
+
 	protected:
 		// nonmax suppression:
 		__inline__ bool isMax2D(const uint8_t layer,

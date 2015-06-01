@@ -19,41 +19,48 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   // e.g. does not perform FAST nonmax suppression. Things like that which are needed by the 
   // mapmaker but not the tracker go in MakeKeyFrame_Rest();
   
+  //Get Brisk Corners
+  std::vector<KeyPoint> keypoints;
+  BriskScaleSpace briskScaleSpace(2);
+  briskScaleSpace.constructPyramid(im);
+  briskScaleSpace.getKeypoints(5,keypoints);
+
   // First, copy out the image data to the pyramid's zero level.
   aLevels[0].im.resize(im.size());
   copy(im, aLevels[0].im);
 
   // Then, for each level...
+  //Initialise object
   for(int i=0; i<LEVELS; i++)
-    {
-      Level &lev = aLevels[i];
-      if(i!=0)
-	{  // .. make a half-size image from the previous level..
-	  lev.im.resize(aLevels[i-1].im.size() / 2);
-	  halfSample(aLevels[i-1].im, lev.im);
-	}
-      
+  {
+    Level &lev = aLevels[i];
+    if(i!=0)
+	  {  //Get From brisk Layer
+        lev.im = briskScaleSpace.getPyramid()[i].img();
+	  }
+    lev.vCorners.clear();
+    lev.vCornerRowLUT.clear();
+  }
 
-      if(i == 0){
-        std::vector<KeyPoint> keypoints;
-        BriskScaleSpace briskScaleSpace(3);
-        briskScaleSpace.constructPyramid(im);
-        briskScaleSpace.getKeypoints(0,keypoints);
-        for (unsigned int i=0; i<keypoints.size(); i++){
-          lev.vCorners.push_back(keypoints[i].pt);
-        }
-      }      
-      // Generate row look-up-table for the FAST corner points: this speeds up 
-      // finding close-by corner points later on.
-      unsigned int v=0;
-      lev.vCornerRowLUT.clear();
-      for(int y=0; y<lev.im.size().y; y++)
-	{
-	  while(v < lev.vCorners.size() && y > lev.vCorners[v].y)
-	    v++;
-	  lev.vCornerRowLUT.push_back(v);
-	}
-    };
+  //fill corners
+  for(unsigned int i=0;i<keypoints.size();i++){
+    aLevels[keypoints[i].octave].vCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
+  }
+
+  //add index
+  for(int i=0; i<LEVELS; i++)
+  {
+    Level &lev = aLevels[i];
+    // Generate row look-up-table for the FAST corner points: this speeds up 
+    // finding close-by corner points later on.
+    unsigned int v=0;
+    for(int y=0; y<lev.im.size().y; y++)
+    {
+      while(v < lev.vCorners.size() && y > lev.vCorners[v].y)
+        v++;
+      lev.vCornerRowLUT.push_back(v);
+    }
+  }
 }
 
 void KeyFrame::MakeKeyFrame_Rest()
