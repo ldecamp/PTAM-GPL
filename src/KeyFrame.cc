@@ -4,6 +4,7 @@
 #include "ptam/SmallBlurryImage.h"
 #include <cvd/vision.h>
 #include <cvd/fast_corner.h>
+#include <brisk/brisk.h>
 
 using namespace CVD;
 using namespace std;
@@ -11,7 +12,7 @@ using namespace GVars3;
 
 //TODO: Change keyframe structure to cope with new descriptors
 
-void KeyFrame::MakeKeyFrame_Lite(BasicImage<byte> &im)
+void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
 {
   // Perpares a Keyframe from an image. Generates pyramid levels, does FAST detection, etc.
   // Does not fully populate the keyframe struct, but only does the bits needed for the tracker;
@@ -32,21 +33,16 @@ void KeyFrame::MakeKeyFrame_Lite(BasicImage<byte> &im)
 	  halfSample(aLevels[i-1].im, lev.im);
 	}
       
-      // .. and detect and store FAST corner points.
-      // I use a different threshold on each level; this is a bit of a hack
-      // whose aim is to balance the different levels' relative feature densities.
-      lev.vCorners.clear();
-      lev.vCandidates.clear();
-      lev.vMaxCorners.clear();
-      if(i == 0)
-	fast_corner_detect_10(lev.im, lev.vCorners, 10);
-      if(i == 1)
-	fast_corner_detect_10(lev.im, lev.vCorners, 15);
-      if(i == 2)
-	fast_corner_detect_10(lev.im, lev.vCorners, 15);
-      if(i == 3)
-	fast_corner_detect_10(lev.im, lev.vCorners, 10);
-      
+
+      if(i == 0){
+        std::vector<KeyPoint> keypoints;
+        BriskScaleSpace briskScaleSpace(3);
+        briskScaleSpace.constructPyramid(im);
+        briskScaleSpace.getKeypoints(0,keypoints);
+        for (unsigned int i=0; i<keypoints.size(); i++){
+          lev.vCorners.push_back(keypoints[i].pt);
+        }
+      }      
       // Generate row look-up-table for the FAST corner points: this speeds up 
       // finding close-by corner points later on.
       unsigned int v=0;

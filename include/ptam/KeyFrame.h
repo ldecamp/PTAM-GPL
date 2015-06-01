@@ -83,7 +83,7 @@ struct KeyFrame
   Level aLevels[LEVELS];  // Images, corners, etc lives in this array of pyramid levels
   std::map<MapPoint*, Measurement> mMeasurements;           // All the measurements associated with the keyframe
   
-  void MakeKeyFrame_Lite(CVD::BasicImage<CVD::byte> &im);   // This takes an image and calculates pyramid levels etc to fill the 
+  void MakeKeyFrame_Lite(CVD::Image<CVD::byte> &im);   // This takes an image and calculates pyramid levels etc to fill the 
                                                             // keyframe data structures with everything that's needed by the tracker..
   void MakeKeyFrame_Rest();                                 // ... while this calculates the rest of the data which the mapmaker needs.
   

@@ -8,6 +8,8 @@ project(ptam)
 # )
 
 find_package(OpenCV REQUIRED)
+find_package(agast REQUIRED)
+find_package(briskcvd REQUIRED)
 
 #Define video binding
 set(PTAM_VIDEO_SOURCE_FILES 
@@ -78,13 +80,14 @@ SET(CALIBRATOR_FILES
 
 include_directories(
   ${PROJECT_SOURCE_DIR}/include 
-  ${PROJECT_SOURCE_DIR}/thirdparty/agast/include)  
+  ${agast_INCLUDE_DIRS}
+  ${briskcvd_INCLUDE_DIRS})  
 
-link_directories(
-  ${PROJECT_SOURCE_DIR}/thirdparty/libcvd/lib 
-  ${PROJECT_SOURCE_DIR}/thirdparty/gvars3/lib 
-  ${PROJECT_SOURCE_DIR}/thirdparty/agast/lib
-)
+# link_directories(
+#   ${PROJECT_SOURCE_DIR}/thirdparty/libcvd/lib 
+#   ${PROJECT_SOURCE_DIR}/thirdparty/gvars3/lib 
+#   ${PROJECT_SOURCE_DIR}/thirdparty/agast/lib
+# )
 
 set(PTAM_LIBRARIES GL glut GLU cvd GVars3 lapack)
 
@@ -106,6 +109,10 @@ ENDIF(CMAKE_BUILD_TYPE MATCHES Release)
 
 # add_dependencies(ptam DEPS ${${PROJECT_NAME}_EXPORTED_TARGETS}})
 target_link_libraries(ptam ${PTAM_LIBRARIES} ${OpenCV_LIBS})
+
+target_link_libraries(ptam ${PTAM_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(ptam ${PTAM_LIBRARIES} ${agast_LIBRARIES})
+target_link_libraries(ptam ${PTAM_LIBRARIES} ${briskcvd_LIBRARIES})
 
 # Camera calibrator 
 add_executable(cameracalibrator ${CALIBRATOR_FILES} ${PTAM_VIDEO_SOURCE_FILES} ${PTAM_HEADER_FILES})
