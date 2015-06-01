@@ -10,16 +10,46 @@
 
 namespace CVD{
 
+	struct Point2f{
+		float x;
+		float y;
+
+		Point2f(){}
+		Point2f(float x, float y): x(x), y(y){}
+
+		Point2f& operator=(const Point2f& pt){
+			x=pt.x;
+			y=pt.y;
+			return *this;
+		}
+
+		Point2f operator+(const Point2f& pt) const{
+			return Point2f(pt.x+x, pt.y+y);
+		}
+
+		Point2f operator-(const Point2f& pt) const{
+			return Point2f(pt.x-x, pt.y-y);
+		}
+
+		bool operator==(const Point2f& pt) const{
+			return (pt.x==x&&pt.y==y);
+		}
+
+		inline float mag_squared(){
+			return sqrt(pow(x,2)+pow(y,2));
+		}
+	};
+
 	struct KeyPoint{
 		float angle;
 		int octave;
-		CVD::ImageRef pt;
+		Point2f pt;
 		float response;
 		float size;
 
 		KeyPoint(){}
 		KeyPoint(float _x, float _y, float _size, float _angle, float _response, float _octave)
-		: angle(_angle), octave(_octave), pt(CVD::ImageRef(_x,_y)), response(_response), size(_size)  {}
+		: angle(_angle), octave(_octave), pt(Point2f(_x,_y)), response(_response), size(_size)  {}
 
 		static inline float overlap( const KeyPoint& kp1, const KeyPoint& kp2 )
 		{
@@ -28,8 +58,8 @@ namespace CVD{
 			float a_2 = a * a;
 			float b_2 = b * b;
 
-			CVD::ImageRef p1 = kp1.pt;
-			CVD::ImageRef p2 = kp2.pt;
+			Point2f p1 = kp1.pt;
+			Point2f p2 = kp2.pt;
 			float c = (float)(p1 - p2).mag_squared();
 
 			float ovrl = 0.f;

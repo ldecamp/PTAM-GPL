@@ -322,7 +322,7 @@ __inline__ int BriskDescriptorExtractor::smoothedIntensity(const CVD::Image<CVD:
 
 bool RoiPredicate(const float minX, const float minY,
 		const float maxX, const float maxY, const KeyPoint& keyPt){
-	const CVD::ImageRef& point = keyPt.pt;
+	const Point2f& point = keyPt.pt;
 	return (point.x < minX) || (point.x >= maxX) || (point.y < minY) || (point.y >= maxY);
 }
 
