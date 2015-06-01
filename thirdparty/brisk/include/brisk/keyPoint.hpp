@@ -19,7 +19,7 @@ namespace CVD{
 
 		KeyPoint(){}
 		KeyPoint(float _x, float _y, float _size, float _angle, float _response, float _octave)
-		: pt(CVD::ImageRef(_x,_y)), angle(_angle), octave(_octave), response(_response), size(_size)  {}
+		: angle(_angle), octave(_octave), pt(CVD::ImageRef(_x,_y)), response(_response), size(_size)  {}
 
 		static inline float overlap( const KeyPoint& kp1, const KeyPoint& kp2 )
 		{

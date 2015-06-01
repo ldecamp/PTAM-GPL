@@ -1,12 +1,19 @@
-#ifndef __BRISK_FEX_H
-#define __BRISK_FEX_H
+#ifndef __BRISK_H
+#define __BRISK_H
 
-#include "KeyPoint.hpp"
-#include <cvd/image.h>
-#include <cvd/byte.h>
 #include <vector>
 #include <stdint.h>
 #include <emmintrin.h>
+
+#include <cvd/image.h>
+#include <cvd/byte.h>
+
+#include <agast/cvWrapper.h>
+#include <agast/agast5_8.h>
+#include <agast/oast9_16.h>
+
+#include "keyPoint.hpp"
+
 // this is needed to avoid aliasing issues with the __m128i data type:
 #ifdef __GNUC__
 	typedef unsigned char __attribute__ ((__may_alias__)) UCHAR_ALIAS;
@@ -120,6 +127,120 @@ class BriskDescriptorExtractor {
 				size/16);
 	    }
 	};
+
+
+class BriskLayer{
+public:
+	struct LayerTypes{
+		static const int HALFSAMPLE=0;
+		static const int TWOTHIRDSAMPLE=1;
+	};
+
+	// construct a base layer
+	BriskLayer(const CVD::Image<CVD::byte>& img, float scale=1.0f, float offset=0.0f);
+	// derive a layer
+	BriskLayer(const BriskLayer& layer, int mode);
+
+	// Fast/Agast without non-max suppression
+	void getAgastPoints(uint8_t threshold, std::vector<CVD::ImageRef>& keypoints);
+
+	// get scores - attention, this is in layer coordinates, not scale=1 coordinates!
+	uint8_t getAgastScore(int x, int y, uint8_t threshold);
+	uint8_t getAgastScore_5_8(int x, int y, uint8_t threshold);
+	uint8_t getAgastScore(float xf, float yf, uint8_t threshold, float scale=1.0f);
+
+	// accessors
+	inline const CVD::Image<CVD::byte>& img() const {return img_;}
+	inline const CVD::Image<CVD::byte>& scores() const {return scores_;}
+	inline float scale() const {return scale_;}
+	inline float offset() const {return offset_;}
+
+private:
+	
+	// access gray values (smoothed/interpolated)
+	__inline__  uint8_t value(const CVD::Image<unsigned char>& mat, float xf, float yf, float scale);
+	
+	CVD::Image<CVD::byte> img_;                // The pyramid level pixels
+	CVD::Image<unsigned char> scores_;             // The fast scores
+	float scale_; // coordinate transformation
+	float offset_;
+
+	agast::OastDetector9_16* oastDetector_;
+	agast::AgastDetector5_8* agastDetector_5_8_; 
+};
+
+class BriskScaleSpace
+	{
+	public:
+		// construct telling the octaves number:
+		BriskScaleSpace(uint8_t _octaves=4);
+		~BriskScaleSpace();
+
+		// construct the image pyramids
+		void constructPyramid(const CVD::Image<CVD::byte>& image);
+
+		// get Keypoints
+		void getKeypoints(const uint8_t _threshold, std::vector<KeyPoint>& keypoints);
+
+	protected:
+		// nonmax suppression:
+		__inline__ bool isMax2D(const uint8_t layer,
+				const int x_layer, const int y_layer);
+		// 1D (scale axis) refinement:
+		__inline__ float refine1D(const float s_05,
+				const float s0, const float s05, float& max); // around octave
+		__inline__ float refine1D_1(const float s_05,
+				const float s0, const float s05, float& max); // around intra
+		__inline__ float refine1D_2(const float s_05,
+				const float s0, const float s05, float& max); // around octave 0 only
+		// 2D maximum refinement:
+		__inline__ float subpixel2D(const int s_0_0, const int s_0_1, const int s_0_2,
+				const int s_1_0, const int s_1_1, const int s_1_2,
+				const int s_2_0, const int s_2_1, const int s_2_2,
+				float& delta_x, float& delta_y);
+		// 3D maximum refinement centered around (x_layer,y_layer)
+		__inline__ float refine3D(const uint8_t layer,
+				const int x_layer, const int y_layer,
+				float& x, float& y, float& scale, bool& ismax);
+
+		// interpolated score access with recalculation when needed:
+		__inline__ int getScoreAbove(const uint8_t layer,
+				const int x_layer, const int y_layer);
+		__inline__ int getScoreBelow(const uint8_t layer,
+				const int x_layer, const int y_layer);
+
+		// return the maximum of score patches above or below
+		__inline__ float getScoreMaxAbove(const uint8_t layer,
+				const int x_layer, const int y_layer,
+				const int threshold, bool& ismax,
+				float& dx, float& dy);
+		__inline__ float getScoreMaxBelow(const uint8_t layer,
+				const int x_layer, const int y_layer,
+				const int threshold, bool& ismax,
+				float& dx, float& dy);
+
+		// the image pyramids:
+		uint8_t layers_;
+		std::vector<BriskLayer> pyramid_;
+
+		// Agast:
+		uint8_t threshold_;
+		uint8_t safeThreshold_;
+
+		// some constant parameters:
+		static const float safetyFactor_;
+		static const float basicSize_;
+	};
+
+class BriskFeatureDetector
+{
+public:
+	BriskFeatureDetector(int threshold, int octaves=4);
+	int threshold;
+	int octaves;
+	void detect(const CVD::Image<CVD::byte>& image, std::vector<KeyPoint>& keypoints);
+};
+
 }
 
 #include "hammingsse.hpp"
