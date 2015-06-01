@@ -1,7 +1,7 @@
 #ifndef __BRISK_FDET_H
 #define __BRISK_FDET_H
 
-#include "KeyPoint.h"
+#include "KeyPoint.hpp"
 #include <cvd/image.h>
 #include <cvd/byte.h>
 #include <vector>

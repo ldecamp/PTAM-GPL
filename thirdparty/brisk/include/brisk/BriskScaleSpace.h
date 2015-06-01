@@ -1,7 +1,7 @@
 #ifndef __BRISK_SS_H
 #define __BRISK_SS_H
 
-#include "KeyPoint.h"
+#include "KeyPoint.hpp"
 #include "BriskLayer.h"
 #include <vector>
 
