@@ -505,6 +505,9 @@ BriskLayer::BriskLayer(const CVD::Image<CVD::byte>& img, float scale, float offs
 	offset_=offset;
 
 	CVD::ImageRef imsize= img_.size();
+	// create an agast detector
+	oastDetector_ = new agast::OastDetector9_16(imsize.x, imsize.y, 0);
+	agastDetector_5_8_ = new agast::AgastDetector5_8(imsize.x, imsize.y, 0);
 }
 // derive a layer
 BriskLayer::BriskLayer(const BriskLayer& layer, int mode){
@@ -535,12 +538,11 @@ void BriskLayer::getAgastPoints(uint8_t threshold, std::vector<CVD::ImageRef>& k
 	std::vector<CvPoint> keypointstmp;
 	oastDetector_->detect((unsigned char*)img_.data(),keypointstmp);
 	keypoints.reserve(keypointstmp.size());
-	for(size_t i=0;i<keypoints.size();++i) //convert to imageRefs
+	for(size_t i=0;i<keypointstmp.size();++i) //convert to imageRefs
 	{
 		keypoints.push_back(CVD::ImageRef(keypointstmp.at(i).x, keypointstmp.at(i).y));
 	}
 	keypointstmp.clear();
-
 	// also write scores
 	const int num=keypoints.size();
 	const int imcols=img_.size().y;
