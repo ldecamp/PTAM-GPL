@@ -119,7 +119,7 @@ class BriskDescriptorExtractor {
 	    typedef int ResultType;
 
 	    // this will count the bits in a ^ b
-	    ResultType operator()(const unsigned char* a, const unsigned char* b, const int size) const
+	    int operator()(const unsigned char* a, const unsigned char* b, const int size) const
 	    {
 		return ssse3_popcntofXORed(
 				(const __m128i*)(a),
