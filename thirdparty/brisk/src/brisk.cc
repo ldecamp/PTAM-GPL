@@ -342,7 +342,6 @@ void BriskDescriptorExtractor::compute(const CVD::Image<CVD::byte>& image,
 	unsigned int basicscale=0;
 
 	const CVD::ImageRef& imgsize = image.size();
-
 	if(!scaleInvariance)
 		basicscale=std::max((int)(scales_/lb_scalerange*(log(1.45*basicSize_/(basicSize06))/log2)+0.5),0);
 	for(unsigned int k=0; k<ksize; k++){
@@ -375,7 +374,7 @@ void BriskDescriptorExtractor::compute(const CVD::Image<CVD::byte>& image,
 	// first, calculate the integral image over the whole image:
 	// current integral image
 	CVD::Image<int> _integral; // the integral image
-	CVD::integral_image(image);
+	_integral = CVD::integral_image(image);
 
 	int* _values=new int[points_]; // for temporary use
 
