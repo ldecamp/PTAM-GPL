@@ -23,7 +23,9 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   std::vector<KeyPoint> keypoints;
   BriskScaleSpace briskScaleSpace(2);
   briskScaleSpace.constructPyramid(im);
-  briskScaleSpace.getKeypoints(10,keypoints);
+  //Value of keypoints needs to be tuned based on environment.
+  //10-15 in lab >60 for ants so far.
+  briskScaleSpace.getKeypoints(60,keypoints);
 
   // First, copy out the image data to the pyramid's zero level.
   aLevels[0].im.resize(im.size());

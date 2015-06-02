@@ -1,10 +1,10 @@
  
- - Preparation tasks
+ - Enhanced Descriptor
 
- ✔  Extract statistics (X,Y,Z) from PTAM + save to csv (Singleton class) @done (15-05-26 14:09)
- ☐  Create script to evaluate bluriness + sharpness image w.r.t. velocity
- ☐  Check Fast corner changes + integrate
- ✔  Tracker Parameters extraction. (Update threshold) @done (15-05-26 17:23)
- ☐  Check feature descriptors and select candidate for integration
- ☐  Finish Fast corner integration from Daniel and get a proper run.
- ✔  Save Frame id with keyframe. @done (15-05-27 10:38)
+Main Track:
+ ☐ Implement Brisk descriptor matcher (port from OpenCV)
+ ☐ Implement BRISK descriptor into PTAM
+
+Nice to have:
+ ☐ Extract brisk cvd to aside repo + publish on github with readme
+ ☐ Add extract make script + tidy CMake so that PTAM CMAKE compile with dependencies
