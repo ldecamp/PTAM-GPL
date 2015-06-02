@@ -35,17 +35,23 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   {
     Level &lev = aLevels[i];
     if(i!=0)
-	  {  //Get From brisk Layer
-        lev.im = briskScaleSpace.getPyramid()[i].img();
+	  { //Get From brisk Layer
+      lev.im.resize(briskScaleSpace.getPyramid()[i].img().size());
+      copy(briskScaleSpace.getPyramid()[i].img(), lev.im);
+      // lev.im.resize(aLevels[i-1].im.size() / 2);
+      // halfSample(aLevels[i-1].im, lev.im);
 	  }
     lev.vCorners.clear();
-    lev.vCornerRowLUT.clear();
+    lev.vCandidates.clear();
+    lev.vMaxCorners.clear();
   }
 
   //fill corners
   for(unsigned int i=0;i<keypoints.size();i++){
     // if(keypoints[i].octave==0)
-      aLevels[keypoints[i].octave].vCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
+      Level &lev = aLevels[keypoints[i].octave];
+      lev.vCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
+      lev.vMaxCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
   }
 
   //add index
@@ -55,6 +61,7 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
     // Generate row look-up-table for the FAST corner points: this speeds up 
     // finding close-by corner points later on.
     unsigned int v=0;
+    lev.vCornerRowLUT.clear();
     for(int y=0; y<=lev.im.size().y; y++)
     {
       while(v < lev.vCorners.size() && y > lev.vCorners[v].y)
@@ -75,8 +82,6 @@ void KeyFrame::MakeKeyFrame_Rest()
   for(int l=0; l<LEVELS; l++)
     {
       Level &lev = aLevels[l];
-      // .. find those FAST corners which are maximal..
-      fast_nonmax(lev.im, lev.vCorners, 10, lev.vMaxCorners);
       // .. and then calculate the Shi-Tomasi scores of those, and keep the ones with
       // a suitably high score as Candidates, i.e. points which the mapmaker will attempt
       // to make new map points out of.

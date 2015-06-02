@@ -528,8 +528,10 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   int nLevelScale = LevelScale(nLevel);
   Candidate &candidate = kSrc.aLevels[nLevel].vCandidates[nCandidate];
   ImageRef irLevelPos = candidate.irLevelPos;
-  Vector<2> v2RootPos = LevelZeroPos(irLevelPos, nLevel);
-  
+  Vector<2> v2RootPos;//LevelZeroPos(irLevelPos, nLevel);
+  v2RootPos[0]=irLevelPos[0];
+  v2RootPos[1]=irLevelPos[1];
+
   Vector<3> v3Ray_SC = unproject(mCamera.UnProject(v2RootPos));
   normalize(v3Ray_SC);
   Vector<3> v3LineDirn_TC = kTarget.se3CfromW.get_rotation() * (kSrc.se3CfromW.get_rotation().inverse() * v3Ray_SC);
@@ -586,8 +588,14 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   vector<ImageRef> &vIR = kTarget.aLevels[nLevel].vCorners;
   if(!kTarget.aLevels[nLevel].bImplaneCornersCached)
     {
-      for(unsigned int i=0; i<vIR.size(); i++)   // over all corners in target img..
-	vv2Corners.push_back(imUnProj[ir(LevelZeroPos(vIR[i], nLevel))]);
+      // over all corners in target img..
+      for(unsigned int i=0; i<vIR.size(); i++) {
+        // vv2Corners.push_back(imUnProj[ir(LevelZeroPos(vIR[i], nLevel))]);
+        Vector<2> v2Ans;
+        v2Ans[0]=vIR[i][0];
+        v2Ans[1]=vIR[i][1];
+        vv2Corners.push_back(imUnProj[ir(v2Ans)]);
+      }  
       kTarget.aLevels[nLevel].bImplaneCornersCached = true;
     }
   
@@ -615,7 +623,11 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   
   //  Found a likely candidate along epipolar ray
   Finder.MakeSubPixTemplate();
-  Finder.SetSubPixPos(LevelZeroPos(vIR[nBest], nLevel));
+  Vector<2> v2Best;
+  v2Best[0]=vIR[nBest][0];
+  v2Best[1]=vIR[nBest][1];
+  Finder.SetSubPixPos(v2Best);
+  // Finder.SetSubPixPos(LevelZeroPos(vIR[nBest], nLevel));
   bool bSubPixConverges = Finder.IterateSubPixToConvergence(kTarget,10);
   if(!bSubPixConverges)
     return false;
