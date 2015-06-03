@@ -74,6 +74,12 @@ class BriskDescriptorExtractor {
 			std::vector<KeyPoint>& keypoints, 
 			CVD::Image<CVD::byte>& descriptors) const;
 
+
+		//set the image and compute the integral (then can use to compute individual descriptor)
+		virtual void setImage(const CVD::Image<CVD::byte>& image);
+		//compute the descriptor for a given point and returns whether the keypoint was on frame
+		virtual bool compute(KeyPoint keypoint, unsigned char descriptor[64]);
+
 	protected:
 		__inline__ int smoothedIntensity(const CVD::Image<CVD::byte>& image,
 				const CVD::Image<int>& integral,const float key_x,
@@ -96,6 +102,9 @@ class BriskDescriptorExtractor {
 		BriskLongPair* longPairs_; 			// d>_dMin
 		unsigned int noShortPairs_; 		// number of shortParis
 		unsigned int noLongPairs_; 			// number of longParis
+
+		CVD::Image<CVD::byte> image_;
+		CVD::Image<int> integral_;
 
 		// general
 		static const float basicSize_;
