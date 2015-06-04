@@ -11,7 +11,7 @@ using namespace CVD;
 
 const float BriskDescriptorExtractor::basicSize_    =12.0;
 const unsigned int BriskDescriptorExtractor::scales_=64;
-const float BriskDescriptorExtractor::scalerange_   =30;        // 40->4 Octaves - else, this needs to be adjusted...
+const float BriskDescriptorExtractor::scalerange_   =40;        // 40->4 Octaves - else, this needs to be adjusted...
 const unsigned int BriskDescriptorExtractor::n_rot_ =1024;	 // discretization of the rotation look-up
 
 const float BriskScaleSpace::safetyFactor_  =1.0;
@@ -459,6 +459,7 @@ bool BriskDescriptorExtractor::compute(KeyPoint kp, unsigned char descriptor[64]
 	// clean-up
 	//delete *_integral;
 	delete [] _values;
+	return true;
 }
 
 // computes the descriptor

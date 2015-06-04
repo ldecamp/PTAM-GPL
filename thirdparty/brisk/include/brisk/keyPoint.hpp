@@ -38,6 +38,10 @@ namespace CVD{
 		inline float mag_squared(){
 			return sqrt(pow(x,2)+pow(y,2));
 		}
+
+		inline CVD::ImageRef ir(){
+			return ImageRef(x,y);
+		}
 	};
 
 	struct KeyPoint{
@@ -50,6 +54,15 @@ namespace CVD{
 		KeyPoint(){}
 		KeyPoint(float _x, float _y, float _size, float _angle, float _response, float _octave)
 		: angle(_angle), octave(_octave), pt(Point2f(_x,_y)), response(_response), size(_size)  {}
+
+		KeyPoint& operator=(const KeyPoint &rhv){
+			angle=rhv.angle;
+			octave=rhv.octave;
+			pt=Point2f(rhv.pt.x,rhv.pt.y);
+			response=rhv.response;
+			size=rhv.size;
+			return *this;
+		}
 
 		static inline float overlap( const KeyPoint& kp1, const KeyPoint& kp2 )
 		{

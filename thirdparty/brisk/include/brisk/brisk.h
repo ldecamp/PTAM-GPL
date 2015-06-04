@@ -74,12 +74,10 @@ class BriskDescriptorExtractor {
 			std::vector<KeyPoint>& keypoints, 
 			CVD::Image<CVD::byte>& descriptors) const;
 
-
 		//set the image and compute the integral (then can use to compute individual descriptor)
 		virtual void setImage(const CVD::Image<CVD::byte>& image);
 		//compute the descriptor for a given point and returns whether the keypoint was on frame
 		virtual bool compute(KeyPoint keypoint, unsigned char descriptor[64]);
-
 	protected:
 		__inline__ int smoothedIntensity(const CVD::Image<CVD::byte>& image,
 				const CVD::Image<int>& integral,const float key_x,
@@ -127,10 +125,17 @@ class BriskDescriptorExtractor {
 	    // in BruteForce if not
 	    typedef int ResultType;
 
+		// this will count the bits in a ^ b
+	    int getScore(const unsigned char* a, const unsigned char* b) const{
+	    	return ssse3_popcntofXORed(
+	    		(const __m128i*)(a),
+				(const __m128i*)(b), 4); 
+	    }
+
 	    // this will count the bits in a ^ b
 	    int operator()(const unsigned char* a, const unsigned char* b, const int size) const
 	    {
-		return ssse3_popcntofXORed(
+			return ssse3_popcntofXORed(
 				(const __m128i*)(a),
 				(const __m128i*)(b),
 				size/16);
