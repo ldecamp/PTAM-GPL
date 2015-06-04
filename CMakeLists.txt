@@ -33,6 +33,7 @@ set(PTAM_HEADER_FILES
 	include/ptam/MapMaker.h  
 	include/ptam/MapPoint.h  
 	include/ptam/MapViewer.h  
+	include/ptam/MatchFinder.h  
 	include/ptam/MiniPatch.h  
 	include/ptam/OpenGL.h
 	include/ptam/PatchFinder.h
@@ -65,6 +66,7 @@ set(PTAM_SOURCE_FILES
 	src/PatchFinder.cc
 	src/Relocaliser.cc
 	src/MiniPatch.cc    
+	src/MatchFinder.cc    
 	src/Tracker.cc
 	src/ARDriver.cc
 	src/EyeGame.cc

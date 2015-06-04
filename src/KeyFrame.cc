@@ -3,6 +3,7 @@
 #include "ptam/ShiTomasi.h"
 #include "ptam/SmallBlurryImage.h"
 #include <cvd/vision.h>
+#include <algorithm>
 #include <cvd/fast_corner.h>
 #include <brisk/brisk.h>
 
@@ -10,66 +11,77 @@ using namespace CVD;
 using namespace std;
 using namespace GVars3;
 
-//TODO: Change keyframe structure to cope with new descriptors
+const bool sortKeyPoints (const Feature& f1, const Feature& f2) { 
+  return (f1.ptRootPos.y()<f2.ptRootPos.y()); 
+}
 
 void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
 {
-  // Perpares a Keyframe from an image. Generates pyramid levels, does FAST detection, etc.
+  // Perpares a Keyframe from an image. Generates pyramid levels + brisk corner detection
   // Does not fully populate the keyframe struct, but only does the bits needed for the tracker;
   // e.g. does not perform FAST nonmax suppression. Things like that which are needed by the 
   // mapmaker but not the tracker go in MakeKeyFrame_Rest();
+  static BriskScaleSpace briskScaleSpace(LEVELS/2);
+  static CVD::BriskDescriptorExtractor extractor(true,true,1.0f);
+  static std::vector<KeyPoint> keypoints;
   
-  //Get Brisk Corners
-  std::vector<KeyPoint> keypoints;
-  BriskScaleSpace briskScaleSpace(2);
+  //Defines the threshold for the fast corner detection of BRISK
+  static gvar3<int> gvdCornerThreshold("KF.BriskFastCornerThreshold", 15, SILENT);   
+
+  keypoints.clear();
+  //build the brisk scale space of the image
   briskScaleSpace.constructPyramid(im);
-  //Value of keypoints needs to be tuned based on environment.
-  //10-15 in lab >60 for ants so far.
-  briskScaleSpace.getKeypoints(60,keypoints);
+  briskScaleSpace.getKeypoints(*gvdCornerThreshold,keypoints);
 
-  // First, copy out the image data to the pyramid's zero level.
-  aLevels[0].im.resize(im.size());
-  copy(im, aLevels[0].im);
-
-  // Then, for each level...
-  //Initialise object
-  for(int i=0; i<LEVELS; i++)
-  {
-    Level &lev = aLevels[i];
-    if(i!=0)
-	  { //Get From brisk Layer
-      lev.im.resize(briskScaleSpace.getPyramid()[i].img().size());
-      copy(briskScaleSpace.getPyramid()[i].img(), lev.im);
-      // lev.im.resize(aLevels[i-1].im.size() / 2);
-      // halfSample(aLevels[i-1].im, lev.im);
-	  }
-    lev.vCorners.clear();
-    lev.vCandidates.clear();
-    lev.vMaxCorners.clear();
+  //clear existing data+copy image
+  for(int i=0; i<LEVELS; i++){
+      ScaleSpace &space = pyramid[i];
+      space.im.resize(briskScaleSpace.getPyramid()[i].img().size());
+      copy(briskScaleSpace.getPyramid()[i].img(), space.im);
+      space.vFeatures.clear();
+      space.vFeaturesLUT.clear();
   }
 
-  //fill corners
-  for(unsigned int i=0;i<keypoints.size();i++){
-    // if(keypoints[i].octave==0)
-      Level &lev = aLevels[keypoints[i].octave];
-      lev.vCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
-      lev.vMaxCorners.push_back(CVD::ImageRef((int)keypoints[i].pt.x,(int)keypoints[i].pt.y));
+  extractor.setImage(im);
+  //map keypoints according to layer
+  for(unsigned int i=0; i<keypoints.size();i++){
+      ScaleSpace &space = pyramid[keypoints[i].octave];
+      unsigned char descriptor[64] = {};
+      //try to get descriptor as well and cache it (used for tracking and mapping)
+      //reject point if cannot build descriptor
+      if(extractor.compute(keypoints[i], descriptor)){
+        Feature f=Feature(keypoints[i],descriptor);
+        space.vFeatures.push_back(f);
+        vFeatures.push_back(f);
+      }
   }
 
-  //add index
-  for(int i=0; i<LEVELS; i++)
-  {
-    Level &lev = aLevels[i];
-    // Generate row look-up-table for the FAST corner points: this speeds up 
-    // finding close-by corner points later on.
-    unsigned int v=0;
-    lev.vCornerRowLUT.clear();
-    for(int y=0; y<=lev.im.size().y; y++)
-    {
-      while(v < lev.vCorners.size() && y > lev.vCorners[v].y)
-        v++;
-      lev.vCornerRowLUT.push_back(v);
-    }
+  //rebuild global index 
+  std::sort(vFeatures.begin(), vFeatures.end(), sortKeyPoints);
+
+  unsigned int v=0;
+  for(int y=0; y<=im.size().y;y++){
+    while(v < vFeatures.size() && y > vFeatures[v].ptRootPos.y()){
+      v++;
+    }    
+    vFeaturesLUT.push_back(v);
+  }
+  
+  //rebuild index 
+  // Generate row look-up-table for the FAST corner points: this speeds up 
+  // finding close-by corner points later on.
+  for(int i=0; i<LEVELS; i++){
+      ScaleSpace &space = pyramid[i];
+
+      //sort list then build index
+      std::sort(space.vFeatures.begin(), space.vFeatures.end(), sortKeyPoints);
+
+      unsigned int v=0;
+      for(int y=0; y<=space.im.size().y;y++){
+        while(v < space.vFeatures.size() && y > space.vFeatures[v].ptRootPos.y())
+          v++;
+        space.vFeaturesLUT.push_back(v);
+      }
   }
 }
 
@@ -78,29 +90,30 @@ void KeyFrame::MakeKeyFrame_Rest()
   // Fills the rest of the keyframe structure needed by the mapmaker:
   // FAST nonmax suppression, generation of the list of candidates for further map points,
   // creation of the relocaliser's SmallBlurryImage.
-  static gvar3<double> gvdCandidateMinSTScore("MapMaker.CandidateMinShiTomasiScore", 70, SILENT);
-  
+  static gvar3<double> gvdCandidateMinSTScore("KF.CandidateMinShiTomasiScore", 70, SILENT);
+
   // For each level...
-  for(int l=0; l<LEVELS; l++)
-    {
-      Level &lev = aLevels[l];
-      // .. and then calculate the Shi-Tomasi scores of those, and keep the ones with
-      // a suitably high score as Candidates, i.e. points which the mapmaker will attempt
-      // to make new map points out of.
-      for(vector<ImageRef>::iterator i=lev.vMaxCorners.begin(); i!=lev.vMaxCorners.end(); i++)
-	{
-	  if(!lev.im.in_image_with_border(*i, 10))
-	    continue;
-	  double dSTScore = FindShiTomasiScoreAtPoint(lev.im, 3, *i);
-	  if(dSTScore > *gvdCandidateMinSTScore)
-	    {
-	      Candidate c;
-	      c.irLevelPos = *i;
-	      c.dSTScore = dSTScore;
-	      lev.vCandidates.push_back(c);
-	    }
-	}
-    };
+  for(int l=0; l<LEVELS;l++){
+    ScaleSpace &space = pyramid[l];
+    // .. and then calculate the Shi-Tomasi scores of those, and keep the ones with
+    // a suitably high score as Candidates, i.e. points which the mapmaker will attempt
+    // to make new map points out of.
+    for(unsigned int i=0;i<space.vFeatures.size();i++){
+      Feature& f=space.vFeatures[i];
+      ImageRef imRef= f.ptRootPos.ir();
+      //Should not be needed since corner should all be in frame
+      if(!space.im.in_image_with_border(imRef, 4))
+        continue;
+      double dSTScore = FindShiTomasiScoreAtPoint(space.im, 3, imRef);
+      
+      if(dSTScore > *gvdCandidateMinSTScore)
+      {
+        //stores negative STS score easier for sorting
+        Candidate c = Candidate(f, dSTScore);
+        space.vCandidates.push_back(c);
+      }
+    }
+  }
   
   // Also, make a SmallBlurryImage of the keyframe: The relocaliser uses these.
   pSBI = new SmallBlurryImage(*this);  
@@ -110,15 +123,14 @@ void KeyFrame::MakeKeyFrame_Rest()
 
 // The keyframe struct is quite happy with default operator=, but Level needs its own
 // to override CVD's reference-counting behaviour.
-Level& Level::operator=(const Level &rhs)
+ScaleSpace& ScaleSpace::operator=(const ScaleSpace &rhs)
 {
   // Operator= should physically copy pixels, not use CVD's reference-counting image copy.
   im.resize(rhs.im.size());
   copy(rhs.im, im);
   
-  vCorners = rhs.vCorners;
-  vMaxCorners = rhs.vMaxCorners;
-  vCornerRowLUT = rhs.vCornerRowLUT;
+  vFeatures = rhs.vFeatures;
+  vFeaturesLUT = rhs.vFeaturesLUT;
   return *this;
 }
 

@@ -3,6 +3,8 @@
 
 #include <math.h>
 #include <cvd/image.h>
+#include <TooN/TooN.h>
+using namespace TooN;
 
 #ifndef M_PI
     #define M_PI 3.141592653589793
@@ -11,36 +13,52 @@
 namespace CVD{
 
 	struct Point2f{
-		float x;
-		float y;
+		Vector<2,float> data;
 
 		Point2f(){}
-		Point2f(float x, float y): x(x), y(y){}
+		Point2f(const Vector<2,float>& val){
+			data=val;
+		}
+		Point2f(const float& x, const float& y){
+			data[0]=x;
+			data[1]=y;
+		}
+
+		inline float x() const{
+			return data[0];
+		}
+
+		inline float y() const{
+			return data[1];
+		}
 
 		Point2f& operator=(const Point2f& pt){
-			x=pt.x;
-			y=pt.y;
+			//copy point data
+			data=pt.data;
 			return *this;
 		}
 
 		Point2f operator+(const Point2f& pt) const{
-			return Point2f(pt.x+x, pt.y+y);
+			return Point2f(data+pt.data);
 		}
 
 		Point2f operator-(const Point2f& pt) const{
-			return Point2f(pt.x-x, pt.y-y);
+			return Point2f(data-pt.data);
 		}
 
+		bool operator<(const Point2f& pt) const{
+			return y()<pt.y()&&x()<pt.x();
+		}
 		bool operator==(const Point2f& pt) const{
-			return (pt.x==x&&pt.y==y);
+			return (pt.x()==x()&&pt.y()==y());
 		}
 
 		inline float mag_squared(){
-			return sqrt(pow(x,2)+pow(y,2));
+			return norm_sq(data);
 		}
 
 		inline CVD::ImageRef ir(){
-			return ImageRef(x,y);
+			return ImageRef(x(),y());
 		}
 	};
 
@@ -58,7 +76,7 @@ namespace CVD{
 		KeyPoint& operator=(const KeyPoint &rhv){
 			angle=rhv.angle;
 			octave=rhv.octave;
-			pt=Point2f(rhv.pt.x,rhv.pt.y);
+			pt=Point2f(rhv.pt.data);
 			response=rhv.response;
 			size=rhv.size;
 			return *this;

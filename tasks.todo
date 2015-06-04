@@ -5,6 +5,12 @@ Main Track:
  ☐ Implement Brisk descriptor matcher (port from OpenCV)
  ☐ Implement BRISK descriptor into PTAM
 
+Brisk PTAM:
+  Need to include brisk scale space object into PTAM algo
+  - Update Tracker initialisation. 
+  - Update Tracker online tracking
+  - Update Mapping
+
 Nice to have:
  ☐ Extract brisk cvd to aside repo + publish on github with readme
  ☐ Add extract make script + tidy CMake so that PTAM CMAKE compile with dependencies

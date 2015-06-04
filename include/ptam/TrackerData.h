@@ -22,6 +22,8 @@ TrackerData(MapPoint *pMapPoint)
   MapPoint &Point;
   PatchFinder Finder;
   
+  //Store descriptor here? 
+
   // Projection itermediates:
   Vector<3> v3Cam;        // Coords in current cam frame
   Vector<2> v2ImPlane;    // Coords in current cam z=1 plane

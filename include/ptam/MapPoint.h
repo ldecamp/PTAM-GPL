@@ -18,6 +18,7 @@ using namespace TooN;
 #include <cvd/image_ref.h>
 #include <cvd/timer.h>
 #include <set>
+//#include <brisk/keyPoint.hpp>
 
 class KeyFrame;
 class TrackerData;
@@ -44,7 +45,10 @@ struct MapPoint
   // What pixels should be used to search for this point?
   KeyFrame *pPatchSourceKF; // The KeyFrame the point was originally made in
   int nSourceLevel;         // Pyramid level in source KeyFrame
+  //Might Need to change this to Point2f
+  //CVD::Point2f irCenter;
   CVD::ImageRef irCenter;   // This is in level-coords in the source pyramid level
+
   
   // What follows next is a bunch of intermediate vectors - they all lead up
   // to being able to calculate v3Pixel{Down,Right}_W, which the PatchFinder

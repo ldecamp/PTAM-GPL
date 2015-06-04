@@ -107,7 +107,7 @@ void PatchFinder::MakeTemplateCoarseCont(MapPoint &p)
     {
       int nOutside;  // Use CVD::transform to warp the patch according the the warping matrix m2
                      // This returns the number of pixels outside the source image hit, which should be zero.
-      nOutside = CVD::transform(p.pPatchSourceKF->aLevels[p.nSourceLevel].im, 
+      nOutside = CVD::transform(p.pPatchSourceKF->pyramid[p.nSourceLevel].im, 
 				mimTemplate, 
 				m2,
 				vec(p.irCenter),
@@ -133,7 +133,7 @@ void PatchFinder::MakeTemplateCoarseCont(MapPoint &p)
 void PatchFinder::MakeTemplateCoarseNoWarp(KeyFrame &k, int nLevel, ImageRef irLevelPos)
 {
   mnSearchLevel = nLevel;
-  Image<byte> &im = k.aLevels[nLevel].im;
+  Image<byte> &im = k.pyramid[nLevel].im;
   if(!im.in_image_with_border(irLevelPos, mnPatchSize / 2 + 1))
     {
       mbTemplateBad = true;
@@ -193,7 +193,7 @@ bool PatchFinder::FindPatchCoarse(ImageRef irPos, KeyFrame &kf, unsigned int nRa
   int nRight = irPos.x + nRange;
   
   // Ref variable for the search level
-  Level &L = kf.aLevels[mnSearchLevel];
+  ScaleSpace &L = kf.pyramid[mnSearchLevel];
   
   // Some bounds checks on the bounding box..
   if(nTop < 0)
@@ -207,28 +207,33 @@ bool PatchFinder::FindPatchCoarse(ImageRef irPos, KeyFrame &kf, unsigned int nRa
   // are near enough the search center. It's a bit optimised to use 
   // a corner row look-up-table, since otherwise the routine
   // would spend a long time trawling throught the whole list of FAST corners!
-  vector<ImageRef>::iterator i;
-  vector<ImageRef>::iterator i_end;
+  vector<Feature>::iterator i;
+  vector<Feature>::iterator i_end;
   
-  i = L.vCorners.begin() + L.vCornerRowLUT[nTop];
+  i = L.vFeatures.begin() + L.vFeaturesLUT[nTop];
   
   if(nBottomPlusOne >= L.im.size().y)
-    i_end = L.vCorners.end();
+    i_end = L.vFeatures.end();
   else 
-    i_end = L.vCorners.begin() + L.vCornerRowLUT[nBottomPlusOne];
+    i_end = L.vFeatures.begin() + L.vFeaturesLUT[nBottomPlusOne];
   
-  ImageRef irBest;             // Best match so far
+  Feature irBest;             // Best match so far
   int nBestSSD = mnMaxSSD + 1; // Best score so far is beyond the max allowed
   
   for(; i<i_end; i++)          // For each corner ...
     {                         
-      if( i->x < nLeft || i->x > nRight)
+      if( (*i).ptRootPos.x() < nLeft || (*i).ptRootPos.x() > nRight)
         continue;
-      if((irPos - *i).mag_squared() > nRange * nRange)
-	continue;              // ... reject all those not close enough..
-
+      if((irPos - (*i).ptRootPos.ir()).mag_squared() > nRange * nRange)
+	      continue;              // ... reject all those not close enough..
+      
+      //Get Hamming distance here
+      // static CVD::HammingSse hamming;
+      // int distance = hamming.getScore(*i.descriptor, descriptor2);
+  
       int nSSD;                // .. and find the ZMSSD at those near enough.
-      nSSD = ZMSSDAtPoint(L.im, *i);
+      nSSD = ZMSSDAtPoint(L.im, (*i).ptRootPos.ir());
+
       if(nSSD < nBestSSD)      // Best yet?
 	{
 	  irBest = *i;
@@ -238,9 +243,7 @@ bool PatchFinder::FindPatchCoarse(ImageRef irPos, KeyFrame &kf, unsigned int nRa
   
   if(nBestSSD < mnMaxSSD)      // Found a valid match?
     {
-      Vector<2> v2Best;
-      v2Best[0]=irBest[0];
-      v2Best[1]=irBest[1];
+      Vector<2> v2Best=irBest.ptRootPos.data;
       mv2CoarsePos= v2Best;//LevelZeroPos(irBest, mnSearchLevel);
       mbFound = true;
     }
@@ -310,7 +313,7 @@ double PatchFinder::IterateSubPix(KeyFrame &kf)
 {
   // Search level pos of patch center
   Vector<2> v2Center = LevelNPos(mv2SubPixPos, mnSearchLevel);
-  BasicImage<byte> &im = kf.aLevels[mnSearchLevel].im;
+  BasicImage<byte> &im = kf.pyramid[mnSearchLevel].im;
   if(!im.in_image_with_border(ir_rounded(v2Center), mnPatchSize / 2 + 1))
     return -1.0;       // Negative return value indicates off edge of image 
   
@@ -335,7 +338,7 @@ double PatchFinder::IterateSubPix(KeyFrame &kf)
   float fMixBR = (dX)       * (dY);
   
   // Loop over template image
-  unsigned long nRowOffset = &kf.aLevels[mnSearchLevel].im[ImageRef(0,1)] - &kf.aLevels[mnSearchLevel].im[ImageRef(0,0)];
+  unsigned long nRowOffset = &kf.pyramid[mnSearchLevel].im[ImageRef(0,1)] - &kf.pyramid[mnSearchLevel].im[ImageRef(0,0)];
   for(ir.y = 1; ir.y < mnPatchSize - 1; ir.y++)
     {
       pTopLeftPixel = &im[::ir(v2Base) + ImageRef(1,ir.y)]; // n.b. the x=1 offset, as with y

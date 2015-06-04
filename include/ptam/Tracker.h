@@ -32,11 +32,13 @@
 
 
 class TrackerData;
-struct Trail    // This struct is used for initial correspondences of the first stereo pair.
+
+// This struct is used for initial correspondences of the first stereo pair.
+struct Trail    
 {
-  MiniPatch mPatch;
-  CVD::ImageRef irCurrentPos;
-  CVD::ImageRef irInitialPos;
+  unsigned char* descriptor;
+  CVD::Point2f ptInitialPos;
+  CVD::Point2f ptCurrentPos;
 };
 
 class Tracker

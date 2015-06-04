@@ -22,6 +22,7 @@ using namespace TooN;
 #include <TooN/se3.h>
 #include <cvd/image.h>
 #include <cvd/byte.h>
+#include <brisk/keyPoint.hpp>
 #include <vector>
 #include <set>
 #include <map>
@@ -29,14 +30,62 @@ using namespace TooN;
 class MapPoint;
 class SmallBlurryImage;
 
+//Needs to be odds
 #define LEVELS 4
 
+//Defines a structure for Storing Corner location + descriptor information
+struct Feature{
+  CVD::Point2f ptRootPos;
+  unsigned char* descriptor;
+  int octave;
+
+  inline Feature(){
+    descriptor=new unsigned char[64];
+    octave=0;
+  }
+  inline Feature(CVD::Point2f ptPos, unsigned char descriptor_[64]){
+    ptRootPos=ptPos;
+    descriptor=descriptor_;
+    octave=0;
+  }
+  inline Feature(CVD::Point2f ptPos, unsigned char descriptor_[64], int octave_){
+    ptRootPos=ptPos;
+    descriptor=descriptor_;
+    octave=octave_;
+  }
+  inline Feature(const CVD::KeyPoint& keypoint, unsigned char descriptor_[64]) {
+    ptRootPos=keypoint.pt;
+    descriptor=descriptor_;
+    octave=keypoint.octave;
+  }
+
+  Feature& operator=(const Feature& ft){
+    ptRootPos=ft.ptRootPos;
+    descriptor=ft.descriptor;
+    octave=ft.octave;
+    return *this;
+  }
+
+};
+
 // Candidate: a feature in an image which could be made into a map point
-struct Candidate
-{
-  CVD::ImageRef irLevelPos;
-  Vector<2> v2RootPos;
+struct Candidate : public Feature{
   double dSTScore;
+  inline Candidate(){}
+  inline Candidate(const Feature& feature, double sTSscore)
+    :dSTScore(sTSscore) {
+    ptRootPos=feature.ptRootPos;
+    descriptor=feature.descriptor;
+    octave=feature.octave;
+  }
+
+  bool operator<(const Candidate& c)const{
+    return (dSTScore<c.dSTScore&&ptRootPos<c.ptRootPos);
+  }
+
+  bool operator==(const Candidate& c) const{
+    return (dSTScore==c.dSTScore&&ptRootPos==c.ptRootPos);
+  }
 };
 
 // Measurement: A 2D image measurement of a map point. Each keyframe stores a bunch of these.
@@ -48,23 +97,22 @@ struct Measurement
   enum {SRC_TRACKER, SRC_REFIND, SRC_ROOT, SRC_TRAIL, SRC_EPIPOLAR} Source; // Where has this measurement come frome?
 };
 
-// Each keyframe is made of LEVELS pyramid levels, stored in struct Level.
-// This contains image data and corner points.
-struct Level
-{
-  inline Level()
-  {
-    bImplaneCornersCached = false;
-  };
-  
-  CVD::Image<CVD::byte> im;                // The pyramid level pixels
-  std::vector<CVD::ImageRef> vCorners;     // All FAST corners on this level
-  std::vector<int> vCornerRowLUT;          // Row-index into the FAST corners, speeds up access
-  std::vector<CVD::ImageRef> vMaxCorners;  // The maximal FAST corners
-  Level& operator=(const Level &rhs);
-  
+struct ScaleSpace{
+  CVD::Image<CVD::byte> im; // store the pyramid level pixels  
+  float scale;
+  float offset; 
+
+  inline ScaleSpace(){
+    bImplaneCornersCached=false;
+  }
+
+  std::vector<Feature> vFeatures;   //stores information about brisk features
+  std::vector<int> vFeaturesLUT; //Row-index into features, for speed up access
   std::vector<Candidate> vCandidates;   // Potential locations of new map points
-  
+
+  ScaleSpace& operator=(const ScaleSpace &rhs);
+
+  //Perf Optimisation
   bool bImplaneCornersCached;           // Also keep image-plane (z=1) positions of FAST corners to speed up epipolar search
   std::vector<Vector<2> > vImplaneCorners; // Corner points un-projected into z=1-plane coordinates
 };
@@ -83,9 +131,10 @@ struct KeyFrame
   
   std::map<MapPoint*, Measurement> mMeasurements;           // All the measurements associated with the keyframe
   
-  //Replace Levels With Briskscalespace 
-  Level aLevels[LEVELS];  // Images, corners, etc lives in this array of pyramid levels
-  
+  ScaleSpace pyramid[LEVELS]; //Representation of Pyramid scale space + features extracted
+  std::vector<Feature> vFeatures;   //stores information about brisk features from all layers
+  std::vector<int> vFeaturesLUT; //Row-index into features, for speed up access overall indexer
+
   void MakeKeyFrame_Lite(CVD::Image<CVD::byte> &im);   // This takes an image and calculates pyramid levels etc to fill the 
                                                             // keyframe data structures with everything that's needed by the tracker..
   void MakeKeyFrame_Rest();                                 // ... while this calculates the rest of the data which the mapmaker needs.
@@ -94,12 +143,10 @@ struct KeyFrame
   double dSceneDepthSigma;
   
   SmallBlurryImage *pSBI; // The relocaliser uses this
-
   int mbKFId; // Save the index of the frame in video (needed for stats)
 };
 
 typedef std::map<MapPoint*, Measurement>::iterator meas_it;  // For convenience, and to work around an emacs paren-matching bug
-
 
 #endif
 

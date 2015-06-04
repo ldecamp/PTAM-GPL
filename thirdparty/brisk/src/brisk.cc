@@ -323,7 +323,7 @@ __inline__ int BriskDescriptorExtractor::smoothedIntensity(const CVD::Image<CVD:
 bool RoiPredicate(const float minX, const float minY,
 	const float maxX, const float maxY, const KeyPoint& keyPt){
 	const Point2f& point = keyPt.pt;
-	return (point.x < minX) || (point.x >= maxX) || (point.y < minY) || (point.y >= maxY);
+	return (point.x() < minX) || (point.x() >= maxX) || (point.y() < minY) || (point.y() >= maxY);
 }
 
 void BriskDescriptorExtractor::setImage(const CVD::Image<CVD::byte>& image){
@@ -355,8 +355,8 @@ bool BriskDescriptorExtractor::compute(KeyPoint kp, unsigned char descriptor[64]
 	}
 
 	const int border = sizeList_[scale];
-	const int border_x=imgsize.y-border;
-	const int border_y=imgsize.x-border;
+	const int border_x=imgsize.x-border;
+	const int border_y=imgsize.y-border;
 
 	//Remove keypoint very close to the border
 	if(RoiPredicate(border, border,border_x,border_y,kp)){
@@ -377,8 +377,8 @@ bool BriskDescriptorExtractor::compute(KeyPoint kp, unsigned char descriptor[64]
 	int theta;
 	int shifter=0;
 	int* pvalues =_values;
-	const float& x=kp.pt.x;
-	const float& y=kp.pt.y;
+	const float& x=kp.pt.x();
+	const float& y=kp.pt.y();
 	unsigned char* ptr = descriptor;
 	if(true/*kp.angle==-1*/){
 		if (!rotationInvariance){
@@ -493,8 +493,8 @@ void BriskDescriptorExtractor::compute(const CVD::Image<CVD::byte>& image,
 			kscales[k]=scale;
 		}
 		const int border = sizeList_[scale];
-		const int border_x=imgsize.y-border;
-		const int border_y=imgsize.x-border;
+		const int border_x=imgsize.x-border;
+		const int border_y=imgsize.y-border;
 		if(RoiPredicate(border, border,border_x,border_y,keypoints[k])){
 			keypoints.erase(beginning+k);
 			kscales.erase(beginningkscales+k);
@@ -534,8 +534,8 @@ void BriskDescriptorExtractor::compute(const CVD::Image<CVD::byte>& image,
 		const int& scale=kscales[k];
 		int shifter=0;
 		int* pvalues =_values;
-		const float& x=kp.pt.x;
-		const float& y=kp.pt.y;
+		const float& x=kp.pt.x();
+		const float& y=kp.pt.y();
 		if(true/*kp.angle==-1*/){
 		if (!rotationInvariance){
 				// don't compute the gradient direction, just assign a rotation of 0°

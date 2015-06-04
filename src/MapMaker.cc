@@ -231,7 +231,7 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
 {
   mdWiggleScale = *mgvdWiggleScale; // Cache this for the new map.
 
-  mCamera.SetImageSize(kF.aLevels[0].im.size());
+  mCamera.SetImageSize(kF.pyramid[0].im.size());
 
   
   vector<HomographyMatch> vMatches;
@@ -383,7 +383,7 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
 // Operates on a single level of a keyframe.
 void MapMaker::ThinCandidates(KeyFrame &k, int nLevel)
 {
-  vector<Candidate> &vCSrc = k.aLevels[nLevel].vCandidates;
+  vector<Candidate> &vCSrc = k.pyramid[nLevel].vCandidates;
   vector<Candidate> vCGood;
   vector<ImageRef> irBusyLevelPos;
   // Make a list of `busy' image locations, which already have features at the same level
@@ -399,7 +399,7 @@ void MapMaker::ThinCandidates(KeyFrame &k, int nLevel)
   unsigned int nMinMagSquared = 10*10;
   for(unsigned int i=0; i<vCSrc.size(); i++)
     {
-      ImageRef irC = vCSrc[i].irLevelPos;
+      ImageRef irC = vCSrc[i].ptRootPos.ir();
       bool bGood = true;
       for(unsigned int j=0; j<irBusyLevelPos.size(); j++)
 	{
@@ -423,11 +423,11 @@ void MapMaker::AddSomeMapPoints(int nLevel)
 {
   KeyFrame &kSrc = *(mMap.vpKeyFrames[mMap.vpKeyFrames.size() - 1]); // The new keyframe
   KeyFrame &kTarget = *(ClosestKeyFrame(kSrc));   
-  Level &l = kSrc.aLevels[nLevel];
+  ScaleSpace &s = kSrc.pyramid[nLevel];
 
   ThinCandidates(kSrc, nLevel);
   
-  for(unsigned int i = 0; i<l.vCandidates.size(); i++)
+  for(unsigned int i = 0; i<s.vCandidates.size(); i++)
     AddPointEpipolar(kSrc, kTarget, nLevel, i);
 };
 
@@ -518,7 +518,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   static bool bMadeCache = false;
   if(!bMadeCache)
     {
-      imUnProj.resize(kSrc.aLevels[0].im.size());
+      imUnProj.resize(kSrc.pyramid[0].im.size());
       ImageRef ir;
       do imUnProj[ir] = mCamera.UnProject(ir);
       while(ir.next(imUnProj.size()));
@@ -526,8 +526,8 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
     }
   
   int nLevelScale = LevelScale(nLevel);
-  Candidate &candidate = kSrc.aLevels[nLevel].vCandidates[nCandidate];
-  ImageRef irLevelPos = candidate.irLevelPos;
+  Candidate &candidate = kSrc.pyramid[nLevel].vCandidates[nCandidate];
+  ImageRef irLevelPos = candidate.ptRootPos.ir();
   Vector<2> v2RootPos;//LevelZeroPos(irLevelPos, nLevel);
   v2RootPos[0]=irLevelPos[0];
   v2RootPos[1]=irLevelPos[1];
@@ -584,19 +584,17 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   Finder.MakeTemplateCoarseNoWarp(kSrc, nLevel, irLevelPos);
   if(Finder.TemplateBad())  return false;
   
-  vector<Vector<2> > &vv2Corners = kTarget.aLevels[nLevel].vImplaneCorners;
-  vector<ImageRef> &vIR = kTarget.aLevels[nLevel].vCorners;
-  if(!kTarget.aLevels[nLevel].bImplaneCornersCached)
+  vector<Vector<2> > &vv2Corners = kTarget.pyramid[nLevel].vImplaneCorners;
+  vector<Feature> &vIR = kTarget.pyramid[nLevel].vFeatures;
+  if(!kTarget.pyramid[nLevel].bImplaneCornersCached)
     {
       // over all corners in target img..
       for(unsigned int i=0; i<vIR.size(); i++) {
         // vv2Corners.push_back(imUnProj[ir(LevelZeroPos(vIR[i], nLevel))]);
-        Vector<2> v2Ans;
-        v2Ans[0]=vIR[i][0];
-        v2Ans[1]=vIR[i][1];
+        Vector<2> v2Ans=vIR[i].ptRootPos.data;
         vv2Corners.push_back(imUnProj[ir(v2Ans)]);
       }  
-      kTarget.aLevels[nLevel].bImplaneCornersCached = true;
+      kTarget.pyramid[nLevel].bImplaneCornersCached = true;
     }
   
   int nBest = -1;
@@ -611,7 +609,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
       if(dDistDiff * dDistDiff > dMaxDistSq)	continue; // skip if not along epi line
       if(v2Im * v2AlongProjectedLine < dMinLen)	continue; // skip if not far enough along line
       if(v2Im * v2AlongProjectedLine > dMaxLen)	continue; // or too far
-      int nZMSSD = Finder.ZMSSDAtPoint(kTarget.aLevels[nLevel].im, vIR[i]);
+      int nZMSSD = Finder.ZMSSDAtPoint(kTarget.pyramid[nLevel].im, vIR[i].ptRootPos.ir());
       if(nZMSSD < nBestZMSSD)
 	{
 	  nBest = i;
@@ -623,9 +621,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   
   //  Found a likely candidate along epipolar ray
   Finder.MakeSubPixTemplate();
-  Vector<2> v2Best;
-  v2Best[0]=vIR[nBest][0];
-  v2Best[1]=vIR[nBest][1];
+  Vector<2> v2Best=vIR[nBest].ptRootPos.data;
   Finder.SetSubPixPos(v2Best);
   // Finder.SetSubPixPos(LevelZeroPos(vIR[nBest], nLevel));
   bool bSubPixConverges = Finder.IterateSubPixToConvergence(kTarget,10);
@@ -734,7 +730,7 @@ bool MapMaker::NeedNewKeyFrame(KeyFrame &kCurrent)
 {
   KeyFrame *pClosest = ClosestKeyFrame(kCurrent);
   double dDist = KeyFrameLinearDist(kCurrent, *pClosest);
-  // dDist *= (1.0 / kCurrent.dSceneDepthMean);
+  dDist *= (1.0 / kCurrent.dSceneDepthMean);
   
   if(dDist > GV2.GetDouble("MapMaker.MaxKFDistWiggleMult",1.0,SILENT) * mdWiggleScaleDepthNormalized)
     return true;
@@ -964,7 +960,7 @@ bool MapMaker::ReFind_Common(KeyFrame &k, MapPoint &p)
       return false;
     }
 
-  ImageRef irImageSize = k.aLevels[0].im.size();
+  ImageRef irImageSize = k.pyramid[0].im.size();
   if(v2Image[0] < 0 || v2Image[1] < 0 || v2Image[0] > irImageSize[0] || v2Image[1] > irImageSize[1])
     {
       p.pMMData->sNeverRetryKFs.insert(&k);
