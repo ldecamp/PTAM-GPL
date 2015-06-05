@@ -31,13 +31,7 @@ namespace CVD{
 		inline float y() const{
 			return data[1];
 		}
-
-		Point2f& operator=(const Point2f& pt){
-			//copy point data
-			data=pt.data;
-			return *this;
-		}
-
+		
 		Point2f operator+(const Point2f& pt) const{
 			return Point2f(data+pt.data);
 		}
@@ -50,14 +44,14 @@ namespace CVD{
 			return y()<pt.y()&&x()<pt.x();
 		}
 		bool operator==(const Point2f& pt) const{
-			return (pt.x()==x()&&pt.y()==y());
+			return (x()==pt.x()&&y()==pt.y());
 		}
 
-		inline float mag_squared(){
+		inline float mag_squared() const{
 			return norm_sq(data);
 		}
 
-		inline CVD::ImageRef ir(){
+		inline CVD::ImageRef ir() const{
 			return ImageRef(x(),y());
 		}
 	};

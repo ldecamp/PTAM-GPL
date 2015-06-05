@@ -36,9 +36,9 @@ class TrackerData;
 // This struct is used for initial correspondences of the first stereo pair.
 struct Trail    
 {
-  unsigned char* descriptor;
-  CVD::Point2f ptInitialPos;
-  CVD::Point2f ptCurrentPos;
+    Feature *ftInitial;
+    Feature *ftCurrent;
+    inline Trail(){}
 };
 
 class Tracker

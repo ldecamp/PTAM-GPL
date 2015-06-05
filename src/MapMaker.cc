@@ -383,6 +383,7 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
 // Operates on a single level of a keyframe.
 void MapMaker::ThinCandidates(KeyFrame &k, int nLevel)
 {
+  const vector<Feature> &vFeat = k.pyramid[nLevel].vFeatures;
   vector<Candidate> &vCSrc = k.pyramid[nLevel].vCandidates;
   vector<Candidate> vCGood;
   vector<ImageRef> irBusyLevelPos;
@@ -399,7 +400,7 @@ void MapMaker::ThinCandidates(KeyFrame &k, int nLevel)
   unsigned int nMinMagSquared = 10*10;
   for(unsigned int i=0; i<vCSrc.size(); i++)
     {
-      ImageRef irC = vCSrc[i].ptRootPos.ir();
+      ImageRef irC = vFeat[vCSrc[i].ftInd].ptRootPos.ir();
       bool bGood = true;
       for(unsigned int j=0; j<irBusyLevelPos.size(); j++)
 	{
@@ -526,8 +527,10 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
     }
   
   int nLevelScale = LevelScale(nLevel);
-  Candidate &candidate = kSrc.pyramid[nLevel].vCandidates[nCandidate];
-  ImageRef irLevelPos = candidate.ptRootPos.ir();
+  const Candidate &candidate = kSrc.pyramid[nLevel].vCandidates[nCandidate];
+  const Feature &feat = kSrc.pyramid[nLevel].vFeatures[candidate.ftInd];
+
+  ImageRef irLevelPos = feat.ptRootPos.ir();
   Vector<2> v2RootPos;//LevelZeroPos(irLevelPos, nLevel);
   v2RootPos[0]=irLevelPos[0];
   v2RootPos[1]=irLevelPos[1];

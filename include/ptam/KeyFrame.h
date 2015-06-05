@@ -43,49 +43,11 @@ struct Feature{
     descriptor=new unsigned char[64];
     octave=0;
   }
-  inline Feature(CVD::Point2f ptPos, unsigned char descriptor_[64]){
-    ptRootPos=ptPos;
-    descriptor=descriptor_;
-    octave=0;
-  }
-  inline Feature(CVD::Point2f ptPos, unsigned char descriptor_[64], int octave_){
-    ptRootPos=ptPos;
-    descriptor=descriptor_;
-    octave=octave_;
-  }
-  inline Feature(const CVD::KeyPoint& keypoint, unsigned char descriptor_[64]) {
-    ptRootPos=keypoint.pt;
-    descriptor=descriptor_;
-    octave=keypoint.octave;
-  }
-
-  Feature& operator=(const Feature& ft){
-    ptRootPos=ft.ptRootPos;
-    descriptor=ft.descriptor;
-    octave=ft.octave;
-    return *this;
-  }
-
 };
 
-// Candidate: a feature in an image which could be made into a map point
-struct Candidate : public Feature{
+struct Candidate{
+  int ftInd;
   double dSTScore;
-  inline Candidate(){}
-  inline Candidate(const Feature& feature, double sTSscore)
-    :dSTScore(sTSscore) {
-    ptRootPos=feature.ptRootPos;
-    descriptor=feature.descriptor;
-    octave=feature.octave;
-  }
-
-  bool operator<(const Candidate& c)const{
-    return (dSTScore<c.dSTScore&&ptRootPos<c.ptRootPos);
-  }
-
-  bool operator==(const Candidate& c) const{
-    return (dSTScore==c.dSTScore&&ptRootPos==c.ptRootPos);
-  }
 };
 
 // Measurement: A 2D image measurement of a map point. Each keyframe stores a bunch of these.

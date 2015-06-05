@@ -11,7 +11,7 @@ using namespace CVD;
 using namespace std;
 using namespace GVars3;
 
-const bool sortKeyPoints (const Feature& f1, const Feature& f2) { 
+const bool sortFeatures (const Feature& f1, const Feature& f2){ 
   return (f1.ptRootPos.y()<f2.ptRootPos.y()); 
 }
 
@@ -33,6 +33,8 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   briskScaleSpace.constructPyramid(im);
   briskScaleSpace.getKeypoints(*gvdCornerThreshold,keypoints);
 
+  vFeatures.clear();
+  vFeaturesLUT.clear();
   //clear existing data+copy image
   for(int i=0; i<LEVELS; i++){
       ScaleSpace &space = pyramid[i];
@@ -50,14 +52,17 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
       //try to get descriptor as well and cache it (used for tracking and mapping)
       //reject point if cannot build descriptor
       if(extractor.compute(keypoints[i], descriptor)){
-        Feature f=Feature(keypoints[i],descriptor);
+        Feature f;
+        f.ptRootPos=keypoints[i].pt;
+        f.descriptor=descriptor;
+        f.octave=keypoints[i].octave;
         space.vFeatures.push_back(f);
         vFeatures.push_back(f);
       }
   }
-
+  
   //rebuild global index 
-  std::sort(vFeatures.begin(), vFeatures.end(), sortKeyPoints);
+  std::sort(vFeatures.begin(), vFeatures.end(), sortFeatures);
 
   unsigned int v=0;
   for(int y=0; y<=im.size().y;y++){
@@ -74,7 +79,7 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
       ScaleSpace &space = pyramid[i];
 
       //sort list then build index
-      std::sort(space.vFeatures.begin(), space.vFeatures.end(), sortKeyPoints);
+      std::sort(space.vFeatures.begin(), space.vFeatures.end(), sortFeatures);
 
       unsigned int v=0;
       for(int y=0; y<=space.im.size().y;y++){
@@ -95,21 +100,23 @@ void KeyFrame::MakeKeyFrame_Rest()
   // For each level...
   for(int l=0; l<LEVELS;l++){
     ScaleSpace &space = pyramid[l];
+    space.vCandidates.clear();
     // .. and then calculate the Shi-Tomasi scores of those, and keep the ones with
     // a suitably high score as Candidates, i.e. points which the mapmaker will attempt
     // to make new map points out of.
     for(unsigned int i=0;i<space.vFeatures.size();i++){
       Feature& f=space.vFeatures[i];
+      //Need to get coordinate at scale for each level
       ImageRef imRef= f.ptRootPos.ir();
-      //Should not be needed since corner should all be in frame
-      if(!space.im.in_image_with_border(imRef, 4))
+      if(!pyramid[0].im.in_image_with_border(imRef, 4))
         continue;
-      double dSTScore = FindShiTomasiScoreAtPoint(space.im, 3, imRef);
+      double dSTScore = FindShiTomasiScoreAtPoint(pyramid[0].im, 3, imRef);
       
       if(dSTScore > *gvdCandidateMinSTScore)
       {
-        //stores negative STS score easier for sorting
-        Candidate c = Candidate(f, dSTScore);
+        Candidate c;
+        c.ftInd=i;
+        c.dSTScore=dSTScore;
         space.vCandidates.push_back(c);
       }
     }

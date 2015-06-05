@@ -10,7 +10,7 @@ class MatchFinder
 public:
 	MatchFinder(int maxDistance);
 
-	bool FindMatchCoarse(const KeyFrame& kf, const Feature& ft, Feature& ft2, unsigned int range);
+	bool FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& ft2, unsigned int range);
 protected:
 	int mMaxDistance;
 };

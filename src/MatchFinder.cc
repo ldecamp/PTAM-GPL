@@ -8,16 +8,21 @@ MatchFinder::MatchFinder(int maxDistance) {
   mMaxDistance = maxDistance;
 }
 
-bool MatchFinder::FindMatchCoarse(const KeyFrame& kf, const Feature& ft, Feature& ft2, unsigned int range) {
+bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& ft2, unsigned int range) {
   bool mbFound = false;
 
+  // cout << "Position of feature to track ";
+  // cout << " x: " << ft.ptRootPos.x();
+  // cout << " y: " << ft.ptRootPos.y();
+  // cout << endl;
+  //check indexer LUT
   Image<CVD::byte> im = kf.pyramid[0].im;
   Point2f pt = ft.ptRootPos;
   // Bounding box of search circle
-  float nTop = pt.y() - range;
-  float nBottomPlusOne = pt.y() + range + 1;
-  float nLeft = pt.x() - range;
-  float nRight = pt.x() + range;
+  int nTop = (int)pt.y() - range;
+  int nBottomPlusOne = (int)pt.y() + range + 1;
+  int nLeft = (int)pt.x() - range;
+  int nRight = (int)pt.x() + range;
 
   // Some bounds checks on the bounding box..
   if (nTop < 0)
@@ -31,8 +36,8 @@ bool MatchFinder::FindMatchCoarse(const KeyFrame& kf, const Feature& ft, Feature
   // are near enough the search center. It's a bit optimised to use
   // a corner row look-up-table, since otherwise the routine
   // would spend a long time trawling throught the whole list of features!
-  std::vector<Feature>::const_iterator i;
-  std::vector<Feature>::const_iterator i_end;
+  std::vector<Feature>::iterator i;
+  std::vector<Feature>::iterator i_end;
 
   i = kf.vFeatures.begin() + kf.vFeaturesLUT[nTop];
 
@@ -41,17 +46,23 @@ bool MatchFinder::FindMatchCoarse(const KeyFrame& kf, const Feature& ft, Feature
   else
     i_end = kf.vFeatures.begin() + kf.vFeaturesLUT[nBottomPlusOne];
 
-  Feature ftBest;             // Best match so far
-  int nBestDist = mMaxDistance + 1; // Best score so far is beyond the max allowed
-
+  Feature* ftBest;             // Best match so far
+  int nBestDist = 10*mMaxDistance + 1; // Best score so far is beyond the max allowed
   float maxRange = range * range;
+  float nBestMag = maxRange;
 
   for (; i < i_end; i++)       // For each corner ...
-  {
+  {  
+    // cout << "Compare with: ";
+    // cout << " x: " << (*i).ptRootPos.x();
+    // cout << " y: " << (*i).ptRootPos.y();
+    // cout << endl;
+
     if ( (*i).ptRootPos.x() < nLeft || (*i).ptRootPos.x() > nRight)
       continue;
 
-    if ( (ft.ptRootPos - (*i).ptRootPos).mag_squared() > maxRange)
+    float cMag=(ft.ptRootPos - (*i).ptRootPos).mag_squared();
+    if ( cMag > maxRange)
       continue;              // ... reject all those not close enough..
 
     static CVD::HammingSse hamming;
@@ -59,17 +70,25 @@ bool MatchFinder::FindMatchCoarse(const KeyFrame& kf, const Feature& ft, Feature
 
     if (dist < nBestDist)     // Best yet?
     {
-      ftBest = *i;
+      ftBest = &(*i);
       nBestDist = dist;
+      nBestMag=cMag;
+    }else if(dist==nBestDist && cMag<nBestMag){
+      ftBest = &(*i);
+      nBestDist = dist;
+      nBestMag=cMag; 
     }
   } // done looping over corners
 
   if (nBestDist < mMaxDistance)     // Found a valid match?
   {
-    ft2 = ftBest;
+    //hack to remove const-ness of type
+    ft2=ftBest;
+    // ft2 = const_cast<Feature *>(ftBest);    
     mbFound = true;
   }
-  else
+  else{
     mbFound = false;
+  }
   return mbFound;
 }

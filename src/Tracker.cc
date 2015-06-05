@@ -120,7 +120,7 @@ void Tracker::TrackFrame(Image<byte> &imFrame, bool bDraw)
     glDrawPixels(mCurrentKF.pyramid[0].im);
     if (GV2.GetInt("Tracker.DrawFASTCorners", 0, SILENT))
     {
-      glColor3f(1, 0, 1);  glPointSize(1); glBegin(GL_POINTS);
+      glColor3f(1, 0, 1);  glPointSize(2); glBegin(GL_POINTS);
       for (unsigned int i = 0; i < mCurrentKF.pyramid[0].vFeatures.size(); i++)
         glVertex(mCurrentKF.pyramid[0].vFeatures[i].ptRootPos.ir());
       glEnd();
@@ -337,7 +337,7 @@ void Tracker::TrackForInitialMap()
       mbUserPressedSpacebar = false;
       vector<pair<CVD::Point2f, CVD::Point2f> > vMatches;   // This is the format the mapmaker wants for the stereo pairs
       for (list<Trail>::iterator i = mlTrails.begin(); i != mlTrails.end(); i++)
-        vMatches.push_back(pair<Point2f, Point2f>(i->ptInitialPos, i->ptCurrentPos));
+        vMatches.push_back(pair<Point2f, Point2f>(i->ftInitial->ptRootPos, i->ftCurrent->ptRootPos));
       //mMapMaker.InitFromStereo(mFirstKF, mCurrentKF, vMatches, mse3CamFromWorld);  // This will take some time!
       mnInitialStage = TRAIL_TRACKING_COMPLETE;
     }
@@ -351,34 +351,31 @@ void Tracker::TrailTracking_Start()
 {
   mCurrentKF.MakeKeyFrame_Rest();  // This populates the Candidates list, which is Shi-Tomasi thresholded.
   mFirstKF = mCurrentKF;
-  mPreviousFrameKF = mFirstKF;  // Always store the previous frame so married-matching can work.
-
-  vector<pair<double,Candidate> > vCornersAndSTScores; //Vector of corners and SHI TOMASI scores
   
+  vector<pair<double,int> > vCornersAndSTScores; //Vector of corners and SHI TOMASI scores
   for(unsigned int i=0; i<mCurrentKF.pyramid[0].vCandidates.size(); i++)  // Copy candidates into a trivially sortable vector
   {                                                                     // so that we can choose the image corners with max ST score
-    Candidate &c = mCurrentKF.pyramid[0].vCandidates[i];
-    vCornersAndSTScores.push_back(pair<double,Candidate>(-1.0 * c.dSTScore, c)); // negative so highest score first in sorted list
+      Candidate &c = mCurrentKF.pyramid[0].vCandidates[i];
+      vCornersAndSTScores.push_back(pair<double,int>(-1.0 * c.dSTScore, c.ftInd)); // negative so highest score first in sorted list
   };
   sort(vCornersAndSTScores.begin(), vCornersAndSTScores.end());  // Sort according to Shi-Tomasi score
-  
   int nToAdd = GV2.GetInt("Tracker.MaxInitialTrails", 1000, SILENT);
-  for (unsigned int i = 0; i < vCornersAndSTScores.size() && nToAdd > 0; i++)
+  for(unsigned int i = 0; i<vCornersAndSTScores.size() && nToAdd > 0; i++)
   {
-    Candidate &c = vCornersAndSTScores[i].second;
-    Trail t;
-    t.descriptor = c.descriptor;
-    t.ptInitialPos = c.ptRootPos;
-    t.ptCurrentPos = t.ptInitialPos;
-    mlTrails.push_back(t);
-    nToAdd--;
+      Trail t;
+      t.ftInitial = &mCurrentKF.pyramid[0].vFeatures[i];
+      t.ftCurrent = &mCurrentKF.pyramid[0].vFeatures[i];
+      mlTrails.push_back(t);
+      nToAdd--;
   }
+  mPreviousFrameKF = mFirstKF;  // Always store the previous frame so married-matching can work.
 }
 
 // Steady-state trail tracking: Advance from the previous frame, remove duds.
 int Tracker::TrailTracking_Advance()
 {
   int nGoodTrails = 0;
+  int nDeleted=0;
   if (mbDraw)
   {
     glPointSize(5);
@@ -390,6 +387,7 @@ int Tracker::TrailTracking_Advance()
     glBegin(GL_LINES);
   }
 
+  cout << "trail size:" << mlTrails.size() << endl; 
   static gvar3<unsigned int> gvTrailSearchRange("Tracker.TrailsSearchRange", 15, SILENT);
 
   for (list<Trail>::iterator i = mlTrails.begin(); i != mlTrails.end();)
@@ -400,43 +398,25 @@ int Tracker::TrailTracking_Advance()
     static gvar3<int> gvnMaxHamming("Tracker.MaxHammingDistance", 100, SILENT);
     //try to match current trail with descriptor in new frame
     static MatchFinder finder = MatchFinder(*gvnMaxHamming);
-    Feature ft, ft2;
-    ft = Feature(trail.ptCurrentPos, trail.descriptor);
-
-    bool mFound = finder.FindMatchCoarse(mCurrentKF, ft, ft2, *gvTrailSearchRange);
+    
+    const Feature &ftOrigin= *trail.ftCurrent;
+    Feature *ftNew, *ftCheck;
+    bool mFound = finder.FindMatchCoarse(mCurrentKF, ftOrigin, ftNew, *gvTrailSearchRange);
     //try to look for a match
     if (mFound) {
-      Feature ft3;
-      trail.ptCurrentPos = ft2.ptRootPos;
-      trail.descriptor = ft2.descriptor;
-      nGoodTrails++;
+      cout << "x:"<< ftNew->ptRootPos.x() << " y:" << ftNew->ptRootPos.y() << endl;
       //try the other way around see if get same correspondence both ways
-      // mFound = finder.FindMatchCoarse(mPreviousFrameKF, ft2, ft3, *gvTrailSearchRange);
+      mFound = finder.FindMatchCoarse(mPreviousFrameKF, *ftNew, ftCheck, *gvTrailSearchRange);
 
-      // cout << "Initial pose at x:"<<ft.ptRootPos.x()<<" y:"<<ft.ptRootPos.y()<<endl;
-      // cout << "descriptor: ";
-      // for (int j=0;j<64;j++){
-      //   cout << ft.descriptor[j];
-      // }
-      // cout << endl;
-
-      // cout << "Reply pose at x:"<<ft3.ptRootPos.x()<<" y:"<<ft3.ptRootPos.y()<<endl;
-      // cout << "descriptor: ";
-      // for (int j=0;j<64;j++){
-      //   cout << ft3.descriptor[j];
-      // }
-      // cout << endl;
-      // static CVD::HammingSse hamming;
-      // //if correspondence doesn't match then not found
-      // if (hamming.getScore(ft.descriptor,ft3.descriptor)>10)
-      //   mFound = false;
-      // else
-      // {
-      //   //if match found keep descriptor + last known pose up to date.
-      //   trail.ptCurrentPos = ft2.ptRootPos;
-      //   trail.descriptor = ft2.descriptor;
-      //   nGoodTrails++;
-      // }
+      if ((ftOrigin.ptRootPos-ftCheck->ptRootPos).mag_squared()>0){
+        mFound = false;
+      }
+      if(mFound)
+      {
+        //if match found keep descriptor + last known pose up to date.
+        trail.ftCurrent = ftNew;
+        nGoodTrails++;
+      }
     }
 
     if (mbDraw) {
@@ -444,13 +424,17 @@ int Tracker::TrailTracking_Advance()
         glColor3f(0, 1, 1); // Failed trails flash purple before dying.
       else
         glColor3f(1, 1, 0);
-      glVertex(trail.ptInitialPos.ir());
+      // cout << "trail init x:"<<trail.ftInitial->ptRootPos.x() << " y:" << trail.ftInitial->ptRootPos.y() << endl;
+      // cout << "trail end x:"<<trail.ftCurrent->ptRootPos.x() << " y:" << trail.ftCurrent->ptRootPos.y() << endl;
+      
+      glVertex(trail.ftInitial->ptRootPos.ir());
       if (mFound) glColor3f(1, 0, 0);
-      glVertex(trail.ptCurrentPos.ir());
+      glVertex(trail.ftCurrent->ptRootPos.ir());
     }
 
     if (!mFound) { // Erase from list of trails if not found this frame.
       mlTrails.erase(i);
+      nDeleted++;
     }
     i = next;
   }
@@ -459,6 +443,9 @@ int Tracker::TrailTracking_Advance()
 
   mPreviousFrameKF = mCurrentKF;
   cout << "n good: " << nGoodTrails << endl;
+  cout << "n bad: " << nDeleted << endl;
+  cout << "trail size:" << mlTrails.size() << endl; 
+
   return nGoodTrails;
 }
 
