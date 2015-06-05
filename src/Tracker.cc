@@ -371,11 +371,14 @@ void Tracker::TrailTracking_Start()
   mPreviousFrameKF = mFirstKF;  // Always store the previous frame so married-matching can work.
 }
 
+void PrintFeature(const Feature& ft){
+  cout << "x:" << ft.ptRootPos.x();
+  cout << " y:" << ft.ptRootPos.y() << endl; 
+}
 // Steady-state trail tracking: Advance from the previous frame, remove duds.
 int Tracker::TrailTracking_Advance()
 {
   int nGoodTrails = 0;
-  int nDeleted=0;
   if (mbDraw)
   {
     glPointSize(5);
@@ -387,8 +390,8 @@ int Tracker::TrailTracking_Advance()
     glBegin(GL_LINES);
   }
 
-  cout << "trail size:" << mlTrails.size() << endl; 
   static gvar3<unsigned int> gvTrailSearchRange("Tracker.TrailsSearchRange", 15, SILENT);
+  cout << *gvTrailSearchRange << endl;
 
   for (list<Trail>::iterator i = mlTrails.begin(); i != mlTrails.end();)
   {
@@ -404,17 +407,33 @@ int Tracker::TrailTracking_Advance()
     bool mFound = finder.FindMatchCoarse(mCurrentKF, ftOrigin, ftNew, *gvTrailSearchRange);
     //try to look for a match
     if (mFound) {
-      cout << "x:"<< ftNew->ptRootPos.x() << " y:" << ftNew->ptRootPos.y() << endl;
+      
       //try the other way around see if get same correspondence both ways
       mFound = finder.FindMatchCoarse(mPreviousFrameKF, *ftNew, ftCheck, *gvTrailSearchRange);
 
-      if ((ftOrigin.ptRootPos-ftCheck->ptRootPos).mag_squared()>0){
+      if (mFound&&(ftOrigin.ptRootPos-ftCheck->ptRootPos).mag_squared()>0.2){
         mFound = false;
       }
       if(mFound)
       {
+        if(abs(ftOrigin.ptRootPos.x()-ftCheck->ptRootPos.x())>10
+          || abs(ftOrigin.ptRootPos.y()-ftCheck->ptRootPos.y())>10){
+          cout << "Warning crap detected" << endl;
+         
+          cout << (ftOrigin.ptRootPos-ftCheck->ptRootPos).mag_squared() << endl;
+        }
+        // cout << "Initial:" << endl;
+        // PrintFeature(*trail.ftInitial);
+        // cout << "Source:" << endl;
+        // PrintFeature(ftOrigin);
+        // cout << "correspondence:" << endl;
+        // PrintFeature(*ftNew);
+        // cout << "Check:" << endl;
+        // PrintFeature(*ftCheck);
+
         //if match found keep descriptor + last known pose up to date.
         trail.ftCurrent = ftNew;
+        trail.ftCurrent->descriptor=trail.ftInitial->descriptor;
         nGoodTrails++;
       }
     }
@@ -423,10 +442,7 @@ int Tracker::TrailTracking_Advance()
       if (!mFound)
         glColor3f(0, 1, 1); // Failed trails flash purple before dying.
       else
-        glColor3f(1, 1, 0);
-      // cout << "trail init x:"<<trail.ftInitial->ptRootPos.x() << " y:" << trail.ftInitial->ptRootPos.y() << endl;
-      // cout << "trail end x:"<<trail.ftCurrent->ptRootPos.x() << " y:" << trail.ftCurrent->ptRootPos.y() << endl;
-      
+        glColor3f(1, 1, 0);      
       glVertex(trail.ftInitial->ptRootPos.ir());
       if (mFound) glColor3f(1, 0, 0);
       glVertex(trail.ftCurrent->ptRootPos.ir());
@@ -434,7 +450,6 @@ int Tracker::TrailTracking_Advance()
 
     if (!mFound) { // Erase from list of trails if not found this frame.
       mlTrails.erase(i);
-      nDeleted++;
     }
     i = next;
   }
@@ -443,9 +458,6 @@ int Tracker::TrailTracking_Advance()
 
   mPreviousFrameKF = mCurrentKF;
   cout << "n good: " << nGoodTrails << endl;
-  cout << "n bad: " << nDeleted << endl;
-  cout << "trail size:" << mlTrails.size() << endl; 
-
   return nGoodTrails;
 }
 

@@ -24,6 +24,7 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& ft2
   int nLeft = (int)pt.x() - range;
   int nRight = (int)pt.x() + range;
 
+  // cout << "left: "<< nLeft << " right: " << nRight << endl;
   // Some bounds checks on the bounding box..
   if (nTop < 0)
     nTop = 0;
@@ -47,7 +48,7 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& ft2
     i_end = kf.vFeatures.begin() + kf.vFeaturesLUT[nBottomPlusOne];
 
   Feature* ftBest;             // Best match so far
-  int nBestDist = 10*mMaxDistance + 1; // Best score so far is beyond the max allowed
+  int nBestDist = mMaxDistance + 1; // Best score so far is beyond the max allowed
   float maxRange = range * range;
   float nBestMag = maxRange;
 
@@ -73,7 +74,7 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& ft2
       ftBest = &(*i);
       nBestDist = dist;
       nBestMag=cMag;
-    }else if(dist==nBestDist && cMag<nBestMag){
+    }else if(dist==nBestDist && cMag<nBestMag){ //if same magnitude take closer point
       ftBest = &(*i);
       nBestDist = dist;
       nBestMag=cMag; 
@@ -84,7 +85,12 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& ft2
   {
     //hack to remove const-ness of type
     ft2=ftBest;
-    // ft2 = const_cast<Feature *>(ftBest);    
+
+    // cout << "Best Match: ";
+    // cout << " x: " << (*ft2).ptRootPos.x();
+    // cout << " y: " << (*ft2).ptRootPos.y();
+    // cout << endl;
+
     mbFound = true;
   }
   else{
