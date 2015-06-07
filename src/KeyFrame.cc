@@ -22,7 +22,8 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   // e.g. does not perform FAST nonmax suppression. Things like that which are needed by the
   // mapmaker but not the tracker go in MakeKeyFrame_Rest();
   static BriskScaleSpace briskScaleSpace(LEVELS / 2);
-  static CVD::BriskDescriptorExtractor extractor(true, true, 1.0f);
+  static gvar3<float> gvdDescriptorScale("KF.BriskDescriptorScale", 0.2f, SILENT);
+  static CVD::BriskDescriptorExtractor extractor(true, true, *gvdDescriptorScale);
   static std::vector<KeyPoint> keypoints;
 
   //Defines the threshold for the fast corner detection of BRISK
