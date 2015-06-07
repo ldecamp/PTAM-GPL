@@ -222,7 +222,7 @@ bool PatchFinder::FindPatchCoarse(ImageRef irPos, KeyFrame &kf, unsigned int nRa
   
   for(; i<i_end; i++)          // For each corner ...
     {                         
-      if( (*i).ptRootPos.x() < nLeft || (*i).ptRootPos.x() > nRight)
+      if( (*i).ptRootPos.x < nLeft || (*i).ptRootPos.x > nRight)
         continue;
       if((irPos - (*i).ptRootPos.ir()).mag_squared() > nRange * nRange)
 	      continue;              // ... reject all those not close enough..
@@ -243,7 +243,7 @@ bool PatchFinder::FindPatchCoarse(ImageRef irPos, KeyFrame &kf, unsigned int nRa
   
   if(nBestSSD < mnMaxSSD)      // Found a valid match?
     {
-      Vector<2> v2Best=irBest.ptRootPos.data;
+      Vector<2> v2Best=irBest.ptRootPos.vec();
       mv2CoarsePos= v2Best;//LevelZeroPos(irBest, mnSearchLevel);
       mbFound = true;
     }

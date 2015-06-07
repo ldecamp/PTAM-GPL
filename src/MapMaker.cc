@@ -594,7 +594,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
       // over all corners in target img..
       for(unsigned int i=0; i<vIR.size(); i++) {
         // vv2Corners.push_back(imUnProj[ir(LevelZeroPos(vIR[i], nLevel))]);
-        Vector<2> v2Ans=vIR[i].ptRootPos.data;
+        Vector<2> v2Ans=vIR[i].ptRootPos.vec();
         vv2Corners.push_back(imUnProj[ir(v2Ans)]);
       }  
       kTarget.pyramid[nLevel].bImplaneCornersCached = true;
@@ -624,7 +624,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   
   //  Found a likely candidate along epipolar ray
   Finder.MakeSubPixTemplate();
-  Vector<2> v2Best=vIR[nBest].ptRootPos.data;
+  Vector<2> v2Best=vIR[nBest].ptRootPos.vec();
   Finder.SetSubPixPos(v2Best);
   // Finder.SetSubPixPos(LevelZeroPos(vIR[nBest], nLevel));
   bool bSubPixConverges = Finder.IterateSubPixToConvergence(kTarget,10);

@@ -40,9 +40,13 @@ struct Feature{
   int octave;
 
   inline Feature(){
-    descriptor=new unsigned char[64];
+    descriptor=NULL;
     octave=0;
   }
+  // // needed to fix memory leak but crashes the program
+  // ~Feature(){
+  //   delete descriptor;
+  // }
 };
 
 struct Candidate{
@@ -96,6 +100,7 @@ struct KeyFrame
   ScaleSpace pyramid[LEVELS]; //Representation of Pyramid scale space + features extracted
   std::vector<Feature> vFeatures;   //stores information about brisk features from all layers
   std::vector<int> vFeaturesLUT; //Row-index into features, for speed up access overall indexer
+  std::vector<Candidate> vCandidates;   // Potential locations of new map points
 
   void MakeKeyFrame_Lite(CVD::Image<CVD::byte> &im);   // This takes an image and calculates pyramid levels etc to fill the 
                                                             // keyframe data structures with everything that's needed by the tracker..
@@ -106,6 +111,10 @@ struct KeyFrame
   
   SmallBlurryImage *pSBI; // The relocaliser uses this
   int mbKFId; // Save the index of the frame in video (needed for stats)
+  //might be needed for clean memory management
+  // ~KeyFrame(){
+  //   delete pSBI;
+  // }
 };
 
 typedef std::map<MapPoint*, Measurement>::iterator meas_it;  // For convenience, and to work around an emacs paren-matching bug

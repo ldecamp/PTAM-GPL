@@ -36,8 +36,8 @@ class TrackerData;
 // This struct is used for initial correspondences of the first stereo pair.
 struct Trail    
 {
-    Feature *ftInitial;
-    Feature *ftCurrent;
+    Feature ftInitial;
+    Feature ftCurrent;
     inline Trail(){}
 };
 

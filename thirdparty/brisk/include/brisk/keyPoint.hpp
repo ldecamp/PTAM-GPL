@@ -13,46 +13,39 @@ using namespace TooN;
 namespace CVD{
 
 	struct Point2f{
-		Vector<2,float> data;
+		float x, y;
 
 		Point2f(){}
-		Point2f(const Vector<2,float>& val){
-			data=val;
-		}
-		Point2f(const float& x, const float& y){
-			data[0]=x;
-			data[1]=y;
-		}
-
-		inline float x() const{
-			return data[0];
-		}
-
-		inline float y() const{
-			return data[1];
-		}
+		Point2f(const Vector<2,float>& data)
+			: x(data[0]), y(data[1]) {}
+		Point2f(const float& x_, const float& y_)
+			: x(x_), y(y_){}
 		
 		Point2f operator+(const Point2f& pt) const{
-			return Point2f(data+pt.data);
+			return Point2f(x+pt.x,y+pt.y);
 		}
 
 		Point2f operator-(const Point2f& pt) const{
-			return Point2f(data-pt.data);
+			return Point2f(x-pt.x,y-pt.y);
 		}
 
 		bool operator<(const Point2f& pt) const{
-			return y()<pt.y()&&x()<pt.x();
+			return y<pt.y&&x<pt.x;
 		}
 		bool operator==(const Point2f& pt) const{
-			return (x()==pt.x()&&y()==pt.y());
+			return (x==pt.x&&y==pt.y);
 		}
 
 		inline float mag_squared() const{
-			return norm_sq(data);
+			return x*x+y*y;
 		}
 
 		inline CVD::ImageRef ir() const{
-			return ImageRef(x(),y());
+			return ImageRef(x,y);
+		}
+
+		inline Vector<2,float> vec() const{
+			return makeVector(x,y);
 		}
 	};
 
@@ -70,7 +63,7 @@ namespace CVD{
 		KeyPoint& operator=(const KeyPoint &rhv){
 			angle=rhv.angle;
 			octave=rhv.octave;
-			pt=Point2f(rhv.pt.data);
+			pt=rhv.pt;
 			response=rhv.response;
 			size=rhv.size;
 			return *this;
