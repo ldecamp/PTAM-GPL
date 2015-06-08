@@ -11,7 +11,7 @@ public:
   MatchFinder(int maxDistance);
 
   // bool FindMatchCoarse(KeyFrame& kf, const Feature& ft, std::vector<Feature>* matches, unsigned int range);
-  bool FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& match, unsigned int range);
+  bool FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& match, int octave, unsigned int range);
 protected:
   int mMaxDistance;
 };

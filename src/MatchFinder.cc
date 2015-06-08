@@ -8,7 +8,7 @@ MatchFinder::MatchFinder(int maxDistance) {
   mMaxDistance = maxDistance;
 }
 
-bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& match, unsigned int range) {
+bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& match, int octave, unsigned int range) {
   bool mbFound = false;
   //check indexer LUT
   Image<CVD::byte> im = kf.pyramid[0].im;
@@ -34,35 +34,42 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& mat
   std::vector<Feature>::iterator i;
   std::vector<Feature>::iterator i_end;
 
-  i = kf.vFeatures.begin() + kf.vFeaturesLUT[nTop];
-
-  if (nBottomPlusOne >= im.size().y)
-    i_end = kf.vFeatures.end();
-  else
-    i_end = kf.vFeatures.begin() + kf.vFeaturesLUT[nBottomPlusOne];
-
+  Feature* ftBest = NULL;
   int nBestDist = mMaxDistance + 1; // Best score so far is beyond the max allowed
   float maxRange = range * range;
-  Feature* ftBest = NULL;
 
-  for (; i < i_end; i++)       // For each corner ...
-  {
-    if ( (*i).ptRootPos.x < nLeft || (*i).ptRootPos.x > nRight)
-      continue;
+  //check on all pyramid level if there is a match starting with most salient features
+  for (int l = LEVELS - 1; l > -1; l--) {
+    if(l!=octave) continue;
+    
+    ScaleSpace& space = kf.pyramid[l];
 
-    float cMag = (ft.ptRootPos - (*i).ptRootPos).mag_squared();
-    if ( cMag > maxRange)
-      continue;              // ... reject all those not close enough..
+    i = space.vFeatures.begin() + space.vFeaturesLUT[nTop];
 
-    static CVD::HammingSse hamming;
-    int dist = hamming.getScore((*i).descriptor, ft.descriptor);
+    if (nBottomPlusOne >= im.size().y)
+      i_end = space.vFeatures.end();
+    else
+      i_end = space.vFeatures.begin() + space.vFeaturesLUT[nBottomPlusOne];
 
-    if (dist < nBestDist)     // Best yet?
+    for (; i < i_end; i++)       // For each corner ...
     {
-      ftBest = &(*i);
-      nBestDist = dist;
+      if ( (*i).ptRootPos.x < nLeft || (*i).ptRootPos.x > nRight)
+        continue;
+
+      float cMag = (ft.ptRootPos - (*i).ptRootPos).mag_squared();
+      if ( cMag > maxRange)
+        continue;              // ... reject all those not close enough..
+
+      static CVD::HammingSse hamming;
+      int dist = hamming.getScore((*i).descriptor, ft.descriptor);
+
+      if (dist < nBestDist)     // Best yet?
+      {
+        ftBest = &(*i);
+        nBestDist = dist;
+      }
     }
-  } // done looping over corners
+  }// done looping over corners
 
   if (nBestDist < mMaxDistance)     // Found a valid match?
   {

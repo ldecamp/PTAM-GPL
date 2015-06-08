@@ -44,6 +44,7 @@ struct Feature {
     octave = 0;
   }
   // // needed to fix memory leak but crashes the program
+  // Fix it at the end when time
   // ~Feature(){
   //   delete descriptor;
   // }
@@ -91,7 +92,7 @@ struct KeyFrame
   inline KeyFrame()
   {
     pSBI = NULL;
-    bImplaneCornersCached = false;
+    //bImplaneCornersCached = false;
   }
   SE3<> se3CfromW;    // The coordinate frame of this key-frame as a Camera-From-World transformation
   bool bFixed;      // Is the coordinate frame of this keyframe fixed? (only true for first KF!)
@@ -100,13 +101,13 @@ struct KeyFrame
 
   ScaleSpace pyramid[LEVELS]; //Representation of Pyramid scale space + features extracted
 
-  std::vector<Feature> vFeatures;   //stores information about brisk features from all layers
-  std::vector<int> vFeaturesLUT; //Row-index into features, for speed up access overall indexer
-  std::vector<Candidate> vCandidates;   // Potential locations of new map points
+  // std::vector<Feature> vFeatures;   //stores information about brisk features from all layers
+  // std::vector<int> vFeaturesLUT; //Row-index into features, for speed up access overall indexer
+  // std::vector<Candidate> vCandidates;   // Potential locations of new map points
 
-  //Perf Optimisation
-  bool bImplaneCornersCached;           // Also keep image-plane (z=1) positions of FAST corners to speed up epipolar search
-  std::vector<Vector<2> > vImplaneCorners; // Corner points un-projected into z=1-plane coordinates
+  // //Perf Optimisation
+  // bool bImplaneCornersCached;           // Also keep image-plane (z=1) positions of FAST corners to speed up epipolar search
+  // std::vector<Vector<2> > vImplaneCorners; // Corner points un-projected into z=1-plane coordinates
 
   void MakeKeyFrame_Lite(CVD::Image<CVD::byte> &im);   // This takes an image and calculates pyramid levels etc to fill the
   // keyframe data structures with everything that's needed by the tracker..

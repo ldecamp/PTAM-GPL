@@ -121,8 +121,8 @@ void Tracker::TrackFrame(Image<byte> &imFrame, bool bDraw)
     if (GV2.GetInt("Tracker.DrawFASTCorners", 0, SILENT))
     {
       glColor3f(1, 0, 1);  glPointSize(2); glBegin(GL_POINTS);
-      for (unsigned int i = 0; i < mCurrentKF.vFeatures.size(); i++)
-        glVertex(mCurrentKF.vFeatures[i].ptRootPos.ir());
+      for (unsigned int i = 0; i < mCurrentKF.pyramid[0].vFeatures.size(); i++)
+        glVertex(mCurrentKF.pyramid[0].vFeatures[i].ptRootPos.ir());
       glEnd();
     }
   }
@@ -132,12 +132,12 @@ void Tracker::TrackFrame(Image<byte> &imFrame, bool bDraw)
   {
     if (mnLostFrames < 3) // .. but only if we're not lost!
     {
-      //  if(mbUseSBIInit)
-      //    CalcSBIRotation();
+      if (mbUseSBIInit)
+        CalcSBIRotation();
 
-      //  ApplyMotionModel();       //
-      // TrackMap();               //  These three lines do the main tracking work.
-      // UpdateMotionModel();      //
+      ApplyMotionModel();       //
+      TrackMap();               //  These three lines do the main tracking work.
+      UpdateMotionModel();      //
 
       AssessTrackingQuality();  //  Check if we're lost or if tracking is poor.
 
@@ -152,18 +152,18 @@ void Tracker::TrackFrame(Image<byte> &imFrame, bool bDraw)
         mMessageForUser << " Map: " << mMap.vpPoints.size() << "P, " << mMap.vpKeyFrames.size() << "KF";
       }
 
-      // static gvar3<int> gvdKfDist("Tracker.MinKeyframeDist", 20, SILENT);
-      // static gvar3<int> gvdQueueSize("Tracker.QueueSize", 3, SILENT);
+      static gvar3<int> gvdKfDist("Tracker.MinKeyframeDist", 20, SILENT);
+      static gvar3<int> gvdQueueSize("Tracker.QueueSize", 3, SILENT);
 
-      // // Heuristics to check if a key-frame should be added to the map:
-      //  if(mTrackingQuality == GOOD &&
-      //    mMapMaker.NeedNewKeyFrame(mCurrentKF) &&
-      //    mnFrame - mnLastKeyFrameDropped > *gvdKfDist  &&
-      //    mMapMaker.QueueSize() < *gvdQueueSize)
-      //  {
-      //    mMessageForUser << " Adding key-frame.";
-      //    AddNewKeyFrame();
-      //  };
+      // Heuristics to check if a key-frame should be added to the map:
+      if (mTrackingQuality == GOOD &&
+          mMapMaker.NeedNewKeyFrame(mCurrentKF) &&
+          mnFrame - mnLastKeyFrameDropped > *gvdKfDist  &&
+          mMapMaker.QueueSize() < *gvdQueueSize)
+      {
+        mMessageForUser << " Adding key-frame.";
+        AddNewKeyFrame();
+      };
     }
     else  // what if there is a map, but tracking has been lost?
     {
@@ -335,9 +335,12 @@ void Tracker::TrackForInitialMap()
     if (mbUserPressedSpacebar)
     {
       mbUserPressedSpacebar = false;
-      vector<pair<CVD::Point2f, CVD::Point2f> > vMatches;   // This is the format the mapmaker wants for the stereo pairs
+      vector<MatchesData> vMatches;   // This is the format the mapmaker wants for the stereo pairs
       for (list<Trail>::iterator i = mlTrails.begin(); i != mlTrails.end(); i++)
-        vMatches.push_back(pair<Point2f, Point2f>(i->ftInitial.ptRootPos, i->ftCurrent.ptRootPos));
+        vMatches.push_back(MatchesData(
+                             i->ftInitial.ptRootPos,
+                             i->ftCurrent.ptRootPos,
+                             i->octave));
       mMapMaker.InitFromStereo(mFirstKF, mCurrentKF, vMatches, mse3CamFromWorld);  // This will take some time!
       mnInitialStage = TRAIL_TRACKING_COMPLETE;
     }
@@ -352,25 +355,46 @@ void Tracker::TrailTracking_Start()
   mCurrentKF.MakeKeyFrame_Rest();  // This populates the Candidates list, which is Shi-Tomasi thresholded.
   mFirstKF = mCurrentKF;
 
-  vector<pair<double, int> > vCornersAndSTScores; //Vector of corners and SHI TOMASI scores
-  for (unsigned int i = 0; i < mCurrentKF.vCandidates.size(); i++) // Copy candidates into a trivially sortable vector
-  {
-    // so that we can choose the image corners with max ST score
-    Candidate &c = mCurrentKF.vCandidates[i];
-    // //ignore higher level corner for initialisation
-    // if (mCurrentKF.vFeatures[c.ftInd].octave != 0)
-    //   continue;
-    vCornersAndSTScores.push_back(pair<double, int>(-1.0 * c.dSTScore, c.ftInd)); // negative so highest score first in sorted list
-  };
-  sort(vCornersAndSTScores.begin(), vCornersAndSTScores.end());  // Sort according to Shi-Tomasi score
   int nToAdd = GV2.GetInt("Tracker.MaxInitialTrails", 1000, SILENT);
-  for (unsigned int i = 0; i < vCornersAndSTScores.size() && nToAdd > 0; i++)
-  {
-    Trail t;
-    t.ftInitial = mCurrentKF.vFeatures[i];
-    t.ftCurrent = mCurrentKF.vFeatures[i];
-    mlTrails.push_back(t);
-    nToAdd--;
+  //for each level fill up the trail if we can (start with higher level features)
+  for (int l = LEVELS - 1; l > -1; l--) {
+    ScaleSpace& space = mCurrentKF.pyramid[l];
+    if ((unsigned int)nToAdd >= space.vCandidates.size())
+    {
+      for (unsigned int i = 0; i < space.vCandidates.size(); i++)
+      {
+        Trail t;
+        t.ftInitial = space.vFeatures[i];
+        t.ftCurrent = space.vFeatures[i];
+        t.octave = l;
+        mlTrails.push_back(t);
+        nToAdd--;
+      }
+      if (nToAdd == 0) break;
+    }
+    //if not enough sort by corner score and add
+    else {
+      vector<pair<double, int> > vCornersAndSTScores; //Vector of corners and SHI TOMASI scores
+      // Copy candidates into a trivially sortable vector
+      for (unsigned int i = 0; i < space.vCandidates.size(); i++)
+      {
+        // so that we can choose the image corners with max ST score
+        Candidate &c = space.vCandidates[i];
+        // negative so highest score first in sorted list
+        vCornersAndSTScores.push_back(pair<double, int>(-1.0 * c.dSTScore, c.ftInd));
+      };
+      sort(vCornersAndSTScores.begin(), vCornersAndSTScores.end());  // Sort according to Shi-Tomasi score
+
+      for (unsigned int i = 0; i < vCornersAndSTScores.size() && nToAdd > 0; i++)
+      {
+        Trail t;
+        t.ftInitial = space.vFeatures[i];
+        t.ftCurrent = space.vFeatures[i];
+        t.octave = l;
+        mlTrails.push_back(t);
+        nToAdd--;
+      }
+    }
   }
   mPreviousFrameKF = mFirstKF;  // Always store the previous frame so married-matching can work.
 }
@@ -402,11 +426,11 @@ int Tracker::TrailTracking_Advance()
 
     const Feature &ftOrigin = trail.ftCurrent;
     Feature *ftNew, *ftCheck;
-    bool mFound = finder.FindMatchCoarse(mCurrentKF, ftOrigin, ftNew, *gvTrailSearchRange);
+    bool mFound = finder.FindMatchCoarse(mCurrentKF, ftOrigin, ftNew, trail.octave, *gvTrailSearchRange);
     //try to look for a match
     if (mFound) {
       //try the other way around see if get same correspondence both ways
-      mFound = finder.FindMatchCoarse(mPreviousFrameKF, *ftNew, ftCheck, *gvTrailSearchRange);
+      mFound = finder.FindMatchCoarse(mPreviousFrameKF, *ftNew, ftCheck, trail.octave, *gvTrailSearchRange);
 
       if (mFound && (ftOrigin.ptRootPos - ftCheck->ptRootPos).mag_squared() > 0) {
         mFound = false;
@@ -455,62 +479,62 @@ int Tracker::TrailTracking_Advance()
 // class PatchFinder finds a projected MapPoint in the current-frame-KeyFrame.
 void Tracker::TrackMap()
 {
-//  // Some accounting which will be used for tracking quality assessment:
-//  for(int i=0; i<LEVELS; i++)
-//    manMeasAttempted[i] = manMeasFound[i] = 0;
+  // // Some accounting which will be used for tracking quality assessment:
+  // for (int i = 0; i < LEVELS; i++)
+  //   manMeasAttempted[i] = manMeasFound[i] = 0;
 
-//  // The Potentially-Visible-Set (PVS) is split into pyramid levels.
-//  vector<TrackerData*> avPVS[LEVELS];
-//  for(int i=0; i<LEVELS; i++)
-//    avPVS[i].reserve(500);
+  // // The Potentially-Visible-Set (PVS) is split into pyramid levels.
+  // vector<TrackerData*> avPVS[LEVELS];
+  // for (int i = 0; i < LEVELS; i++)
+  //   avPVS[i].reserve(500);
 
-//  // For all points in the map..
-//  for(unsigned int i=0; i<mMap.vpPoints.size(); i++)
-//  {
-//    MapPoint &p= *(mMap.vpPoints[i]);
-//      // Ensure that this map point has an associated TrackerData struct.
-//    if(!p.pTData) p.pTData = new TrackerData(&p);
-//    TrackerData &TData = *p.pTData;
+  // // For all points in the map..
+  // for (unsigned int i = 0; i < mMap.vpPoints.size(); i++)
+  // {
+  //   MapPoint &p = *(mMap.vpPoints[i]);
+  //   // Ensure that this map point has an associated TrackerData struct.
+  //   if (!p.pTData) p.pTData = new TrackerData(&p);
+  //   TrackerData &TData = *p.pTData;
 
-//      // Project according to current view, and if it's not in the image, skip.
-//    TData.Project(mse3CamFromWorld, mCamera);
-//    if(!TData.bInImage)
-//      continue;
+  //   // Project according to current view, and if it's not in the image, skip.
+  //   TData.Project(mse3CamFromWorld, mCamera);
+  //   if (!TData.bInImage)
+  //     continue;
 
-//      // Calculate camera projection derivatives of this point.
-//    TData.GetDerivsUnsafe(mCamera);
+  //   // Calculate camera projection derivatives of this point.
+  //   TData.GetDerivsUnsafe(mCamera);
 
-//      // And check what the PatchFinder (included in TrackerData) makes of the mappoint in this view..
-//    TData.nSearchLevel = TData.Finder.CalcSearchLevelAndWarpMatrix(TData.Point, mse3CamFromWorld, TData.m2CamDerivs);
-//    if(TData.nSearchLevel == -1)
-//      continue;   // a negative search pyramid level indicates an inappropriate warp for this view, so skip.
+  //   // And check what the PatchFinder (included in TrackerData) makes of the mappoint in this view..
+  //   TData.nSearchLevel = TData.Finder.CalcSearchLevelAndWarpMatrix(TData.Point, mse3CamFromWorld, TData.m2CamDerivs);
+  //   if (TData.nSearchLevel == -1)
+  //     continue;   // a negative search pyramid level indicates an inappropriate warp for this view, so skip.
 
-//      // Otherwise, this point is suitable to be searched in the current image! Add to the PVS.
-//    TData.bSearched = false;
-//    TData.bFound = false;
-//    avPVS[TData.nSearchLevel].push_back(&TData);
-//  };
+  //   // Otherwise, this point is suitable to be searched in the current image! Add to the PVS.
+  //   TData.bSearched = false;
+  //   TData.bFound = false;
+  //   avPVS[TData.nSearchLevel].push_back(&TData);
+  // };
 
-//  // Next: A large degree of faffing about and deciding which points are going to be measured!
-//  // First, randomly shuffle the individual levels of the PVS.
-//  for(int i=0; i<LEVELS; i++)
-//    random_shuffle(avPVS[i].begin(), avPVS[i].end());
+  // // Next: A large degree of faffing about and deciding which points are going to be measured!
+  // // First, randomly shuffle the individual levels of the PVS.
+  // for (int i = 0; i < LEVELS; i++)
+  //   random_shuffle(avPVS[i].begin(), avPVS[i].end());
 
-//  // The next two data structs contain the list of points which will next
-//  // be searched for in the image, and then used in pose update.
-//  vector<TrackerData*> vNextToSearch;
-//  vector<TrackerData*> vIterationSet;
+  // // The next two data structs contain the list of points which will next
+  // // be searched for in the image, and then used in pose update.
+  // vector<TrackerData*> vNextToSearch;
+  // vector<TrackerData*> vIterationSet;
 
-//  // Tunable parameters to do with the coarse tracking stage:
-//  static gvar3<unsigned int> gvnCoarseMin("Tracker.CoarseMin", 20, SILENT);   // Min number of large-scale features for coarse stage
-//  static gvar3<unsigned int> gvnCoarseMax("Tracker.CoarseMax", 60, SILENT);   // Max number of large-scale features for coarse stage
-//  static gvar3<unsigned int> gvnCoarseRange("Tracker.CoarseRange", 30, SILENT);       // Pixel search radius for coarse features
-//  static gvar3<int> gvnCoarseSubPixIts("Tracker.CoarseSubPixIts", 8, SILENT); // Max sub-pixel iterations for coarse features
-//  static gvar3<int> gvnCoarseDisabled("Tracker.DisableCoarse", 0, SILENT);    // Set this to 1 to disable coarse stage (except after recovery)
-//  static gvar3<double> gvdCoarseMinVel("Tracker.CoarseMinVelocity", 0.006, SILENT);  // Speed above which coarse stage is used.
+  // // Tunable parameters to do with the coarse tracking stage:
+  // static gvar3<unsigned int> gvnCoarseMin("Tracker.CoarseMin", 20, SILENT);   // Min number of large-scale features for coarse stage
+  // static gvar3<unsigned int> gvnCoarseMax("Tracker.CoarseMax", 60, SILENT);   // Max number of large-scale features for coarse stage
+  // static gvar3<unsigned int> gvnCoarseRange("Tracker.CoarseRange", 30, SILENT);       // Pixel search radius for coarse features
+  // static gvar3<int> gvnCoarseSubPixIts("Tracker.CoarseSubPixIts", 8, SILENT); // Max sub-pixel iterations for coarse features
+  // static gvar3<int> gvnCoarseDisabled("Tracker.DisableCoarse", 0, SILENT);    // Set this to 1 to disable coarse stage (except after recovery)
+  // static gvar3<double> gvdCoarseMinVel("Tracker.CoarseMinVelocity", 0.006, SILENT);  // Speed above which coarse stage is used.
 
-//  unsigned int nCoarseMax = *gvnCoarseMax;
-//  unsigned int nCoarseRange = *gvnCoarseRange;
+  // unsigned int nCoarseMax = *gvnCoarseMax;
+  // unsigned int nCoarseRange = *gvnCoarseRange;
 
 //  mbDidCoarse = false;
 

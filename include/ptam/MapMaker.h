@@ -35,6 +35,16 @@ struct MapMakerData
   {  return sMeasurementKFs.size(); }
 };
 
+struct MatchesData{
+  CVD::Point2f source;
+  CVD::Point2f match;
+  int octave;
+
+  inline MatchesData(){}
+  inline MatchesData(CVD::Point2f src, CVD::Point2f mtch, int oct)
+    : source(src), match(mtch), octave(oct){ }
+};  
+
 // MapMaker dervives from CVD::Thread, so everything in void run() is its own thread.
 class MapMaker : protected CVD::Thread
 {
@@ -44,7 +54,7 @@ public:
 
   // Make a map from scratch. Called by the tracker.
   bool InitFromStereo(KeyFrame &kFirst, KeyFrame &kSecond,
-                      std::vector<std::pair<CVD::Point2f, CVD::Point2f> > &vMatches,
+                      std::vector<MatchesData> &vMatches,
                       SE3<> &se3CameraPos);
 
   bool InitFromStereo_OLD(KeyFrame &kFirst, KeyFrame &kSecond,  // EXPERIMENTAL HACK
@@ -72,9 +82,9 @@ protected:
 
   // Map expansion functions:
   void AddKeyFrameFromTopOfQueue();
-  void ThinCandidates(KeyFrame &k);
-  void AddSomeMapPoints();
-  bool AddPointEpipolar(KeyFrame &kSrc, KeyFrame &kTarget, int nCandidate);
+  void ThinCandidates(KeyFrame &k, int nLevel);
+  void AddSomeMapPoints(int nLevel);
+  bool AddPointEpipolar(KeyFrame &kSrc, KeyFrame &kTarget, int nLevel, int nCandidate);
   // Returns point in ref frame B
   Vector<3> ReprojectPoint(SE3<> se3AfromB, const Vector<2> &v2A, const Vector<2> &v2B);
 

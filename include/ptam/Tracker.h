@@ -38,6 +38,7 @@ struct Trail
 {
   Feature ftInitial;
   Feature ftCurrent;
+  int octave;
   inline Trail() {}
 };
 

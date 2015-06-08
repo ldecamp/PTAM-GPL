@@ -227,7 +227,7 @@ Vector<3> MapMaker::ReprojectPoint(SE3<> se3AfromB, const Vector<2> &v2A, const 
 // and a vector of image correspondences. Uses the
 bool MapMaker::InitFromStereo(KeyFrame &kF,
                               KeyFrame &kS,
-                              vector<pair<Point2f, Point2f> > &vTrailMatches,
+                              vector<MatchesData> &vTrailMatches,
                               SE3<> &se3TrackerPose)
 {
   mdWiggleScale = *mgvdWiggleScale; // Cache this for the new map.
@@ -238,8 +238,8 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
   for (unsigned int i = 0; i < vTrailMatches.size(); i++)
   {
     HomographyMatch m;
-    m.v2CamPlaneFirst = mCamera.UnProject(vTrailMatches[i].first.vec());
-    m.v2CamPlaneSecond = mCamera.UnProject(vTrailMatches[i].second.vec());
+    m.v2CamPlaneFirst = mCamera.UnProject(vTrailMatches[i].source.vec());
+    m.v2CamPlaneSecond = mCamera.UnProject(vTrailMatches[i].match.vec());
     m.m2PixelProjectionJac = mCamera.GetProjectionDerivs();
     vMatches.push_back(m);
   }
@@ -283,10 +283,10 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
   {
     MapPoint *p = new MapPoint();
 
-    Point2f first = vTrailMatches[i].first;
+    Point2f first = vTrailMatches[i].source;
     // Patch source stuff:
     p->pPatchSourceKF = pkFirst;
-    p->nSourceLevel = 0;
+    p->nSourceLevel = vTrailMatches[i].octave;
     p->v3Normal_NC = makeVector( 0, 0, -1);
     p->irCenter = first.ir();
     p->v3Center_NC = unproject(mCamera.UnProject(first.vec()));
@@ -300,7 +300,7 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
     // Do sub-pixel alignment on the second image
     finder.MakeTemplateCoarseNoWarp(*p);
     finder.MakeSubPixTemplate();
-    finder.SetSubPixPos(vTrailMatches[i].second.vec());
+    finder.SetSubPixPos(vTrailMatches[i].match.vec());
     bool bGood = finder.IterateSubPixToConvergence(*pkSecond, 10);
     if (!bGood)
     {
@@ -323,7 +323,7 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
     Measurement mFirst;
     mFirst.nLevel = 0;
     mFirst.Source = Measurement::SRC_ROOT;
-    mFirst.v2RootPos = vTrailMatches[i].first.vec();
+    mFirst.v2RootPos = vTrailMatches[i].source.vec();
     mFirst.bSubPix = true;
     pkFirst->mMeasurements[p] = mFirst;
     p->pMMData->sMeasurementKFs.insert(pkFirst);
@@ -336,12 +336,10 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
     pkSecond->mMeasurements[p] = mSecond;
     p->pMMData->sMeasurementKFs.insert(pkSecond);
   }
-
   mMap.vpKeyFrames.push_back(pkFirst);
   mMap.vpKeyFrames.push_back(pkSecond);
   pkFirst->MakeKeyFrame_Rest();
   pkSecond->MakeKeyFrame_Rest();
-
   for (int i = 0; i < 5; i++)
     BundleAdjustAll();
 
@@ -353,7 +351,10 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
 
   Stats::SetScale((double)mdWiggleScaleDepthNormalized); //Update Scene scale
 
-  AddSomeMapPoints();
+  AddSomeMapPoints(0);
+  AddSomeMapPoints(3);
+  AddSomeMapPoints(1);
+  AddSomeMapPoints(2);
 
   mbBundleConverged_Full = false;
   mbBundleConverged_Recent = false;
@@ -379,37 +380,19 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
 // to make a new map point by epipolar search. We don't want to make new points
 // where there are already existing map points, this routine erases such candidates.
 // Operates on a single level of a keyframe.
-void MapMaker::ThinCandidates(KeyFrame &k)
+void MapMaker::ThinCandidates(KeyFrame &k, int nLevel)
 {
-  //build a list of integer of feature id in the neighbourhood of the map points
-  //quick and dirty for no optimize when working
-
-  const vector<Feature> &vFeat = k.vFeatures;
-  vector<Candidate> &vCSrc = k.vCandidates;
+  vector<Candidate> &vCSrc = k.pyramid[nLevel].vCandidates;
+  const vector<Feature> &vFeat = k.pyramid[nLevel].vFeatures;
   vector<Candidate> vCGood;
-  vector<Point2f> irBusyLevelPos[LEVELS];
-
-  // // Make a list of `busy' image locations, which already have features at the same level
-  // // or at one level higher.
-
-  //No need to scale anymore since corner position are in root frame coordinate
+  vector<Point2f> irBusyLevelPos;
+  // Make a list of `busy' image locations, which already have features at the same level
+  // or at one level higher.
   for (meas_it it = k.mMeasurements.begin(); it != k.mMeasurements.end(); it++)
   {
-    int lvl = it->second.nLevel;
-    if (lvl == 0) {
-      irBusyLevelPos[1].push_back(Point2f(it->second.v2RootPos));
-      irBusyLevelPos[2].push_back(Point2f(it->second.v2RootPos));
-      irBusyLevelPos[3].push_back(Point2f(it->second.v2RootPos));
-    } else if (lvl == 1) {
-      irBusyLevelPos[2].push_back(Point2f(it->second.v2RootPos));
-      irBusyLevelPos[3].push_back(Point2f(it->second.v2RootPos));
-    } else if (lvl == 2) {
-      irBusyLevelPos[0].push_back(Point2f(it->second.v2RootPos));
-      irBusyLevelPos[3].push_back(Point2f(it->second.v2RootPos));
-    } else {
-      irBusyLevelPos[0].push_back(Point2f(it->second.v2RootPos));
-      irBusyLevelPos[1].push_back(Point2f(it->second.v2RootPos));
-    }
+    if (!(it->second.nLevel == nLevel || it->second.nLevel == nLevel + 1))
+      continue;
+    irBusyLevelPos.push_back(Point2f(it->second.v2RootPos));
   }
 
   // Only keep those candidates further than 10 pixels away from busy positions.
@@ -419,9 +402,9 @@ void MapMaker::ThinCandidates(KeyFrame &k)
     const Feature& feat = vFeat[vCSrc[i].ftInd];
     const Point2f& irC = feat.ptRootPos;
     bool bGood = true;
-    for (unsigned int j = 0; j < irBusyLevelPos[feat.octave].size(); j++)
+    for (unsigned int j = 0; j < irBusyLevelPos.size(); j++)
     {
-      Point2f irB = irBusyLevelPos[feat.octave][j];
+      Point2f irB = irBusyLevelPos[j];
       if ((irB - irC).mag_squared() < nMinMagSquared)
       {
         bGood = false;
@@ -437,17 +420,16 @@ void MapMaker::ThinCandidates(KeyFrame &k)
 // Adds map points by epipolar search to the last-added key-frame, at a single
 // specified pyramid level. Does epipolar search in the target keyframe as closest by
 // the ClosestKeyFrame function.
-void MapMaker::AddSomeMapPoints()
+void MapMaker::AddSomeMapPoints(int nLevel)
 {
   KeyFrame &kSrc = *(mMap.vpKeyFrames[mMap.vpKeyFrames.size() - 1]); // The new keyframe
   KeyFrame &kTarget = *(ClosestKeyFrame(kSrc));
+  ScaleSpace &space = kSrc.pyramid[nLevel];
 
-  ThinCandidates(kSrc);
+  ThinCandidates(kSrc, nLevel);
 
-  cout << "candidate size: " << kSrc.vCandidates.size() << endl;
-
-  for (unsigned int i = 0; i < kSrc.vCandidates.size(); i++)
-    AddPointEpipolar(kSrc, kTarget, i);
+  for (unsigned int i = 0; i < space.vCandidates.size(); i++)
+    AddPointEpipolar(kSrc, kTarget, nLevel, i);
 };
 
 // Rotates/translates the whole map and all keyframes
@@ -515,7 +497,11 @@ void MapMaker::AddKeyFrameFromTopOfQueue()
   // And maybe we missed some - this now adds to the map itself, too.
   ReFindInSingleKeyFrame(*pK);
 
-  AddSomeMapPoints();       // .. and add more map points by epipolar search.
+  AddSomeMapPoints(3);       // .. and add more map points by epipolar search.
+  AddSomeMapPoints(0);
+  AddSomeMapPoints(1);
+  AddSomeMapPoints(2);
+
 
   mbBundleConverged_Full = false;
   mbBundleConverged_Recent = false;
@@ -526,6 +512,7 @@ void MapMaker::AddKeyFrameFromTopOfQueue()
 // if a match is found.
 bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
                                 KeyFrame &kTarget,
+                                int nLevel,
                                 int nCandidate)
 {
   static Image<Vector<2> > imUnProj;
@@ -539,9 +526,8 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
     bMadeCache = true;
   }
 
-  const Candidate &candidate = kSrc.vCandidates[nCandidate];
-  const Feature &feat = kSrc.vFeatures[candidate.ftInd];
-  int nLevel = feat.octave;
+  const Candidate &candidate = kSrc.pyramid[nLevel].vCandidates[nCandidate];
+  const Feature &feat = kSrc.pyramid[nLevel].vFeatures[candidate.ftInd];
   int nLevelScale = kSrc.pyramid[nLevel].scale;
 
   // ImageRef irLevelPos = feat.ptRootPos.ir();
@@ -599,16 +585,16 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   if (dMaxLen > 2.0)   dMaxLen = 2.0;
 
   //Perf Optimisation cache projected corner location
-  vector<Vector<2> > &vv2Corners = kTarget.vImplaneCorners;
-  vector<Feature> &vIR = kTarget.vFeatures;
-  if (!kTarget.bImplaneCornersCached)
+  vector<Vector<2> > &vv2Corners = kTarget.pyramid[nLevel].vImplaneCorners;
+  vector<Feature> &vIR = kTarget.pyramid[nLevel].vFeatures;
+  if (!kTarget.pyramid[nLevel].bImplaneCornersCached)
   {
     // over all corners in target img..
     for (unsigned int i = 0; i < vIR.size(); i++) {
       Vector<2> v2Ans = vIR[i].ptRootPos.vec();
       vv2Corners.push_back(imUnProj[ir(v2Ans)]);
     }
-    kTarget.bImplaneCornersCached = true;
+    kTarget.pyramid[nLevel].bImplaneCornersCached = true;
   }
 
   int nBest = -1;

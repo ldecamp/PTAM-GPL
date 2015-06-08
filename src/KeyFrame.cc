@@ -2,6 +2,7 @@
 #include "ptam/KeyFrame.h"
 #include "ptam/ShiTomasi.h"
 #include "ptam/SmallBlurryImage.h"
+#include "ptam/LevelHelpers.h"
 #include <cvd/vision.h>
 #include <algorithm>
 #include <cvd/fast_corner.h>
@@ -34,9 +35,6 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   briskScaleSpace.constructPyramid(im);
   briskScaleSpace.getKeypoints(*gvdCornerThreshold, keypoints);
 
-  vFeatures.clear();
-  vFeaturesLUT.clear();
-
   //clear existing data+copy image
   for (int i = 0; i < LEVELS; i++) {
     ScaleSpace &space = pyramid[i];
@@ -44,6 +42,9 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
     copy(briskScaleSpace.getPyramid()[i].img(), space.im);
     space.scale = briskScaleSpace.getPyramid()[i].scale();
     space.offset = briskScaleSpace.getPyramid()[i].offset();
+
+    space.vFeatures.clear();
+    space.vFeaturesLUT.clear();
   }
 
   extractor.setImage(im);
@@ -53,23 +54,26 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
     //try to get descriptor as well and cache it (used for tracking and mapping)
     //reject point if cannot build descriptor
     if (extractor.compute(keypoints[i], descriptor)) {
+      ScaleSpace &space = pyramid[keypoints[i].octave];
       Feature f;
       f.ptRootPos = keypoints[i].pt;
       f.descriptor = descriptor;
-      f.octave = keypoints[i].octave;
-      vFeatures.push_back(f);
+      space.vFeatures.push_back(f);
     }
   }
 
-  //rebuild global index
-  std::sort(vFeatures.begin(), vFeatures.end(), sortFeatures);
+  for (int l = 0; l < LEVELS; l++) {
+    ScaleSpace &space = pyramid[l];
+    //rebuild global index
+    std::sort(space.vFeatures.begin(), space.vFeatures.end(), sortFeatures);
 
-  unsigned int v = 0;
-  for (int y = 0; y <= im.size().y; y++) {
-    while (v < vFeatures.size() && y > vFeatures[v].ptRootPos.y) {
-      v++;
+    unsigned int v = 0;
+    for (int y = 0; y <= im.size().y; y++) {
+      while (v < space.vFeatures.size() && y > space.vFeatures[v].ptRootPos.y) {
+        v++;
+      }
+      space.vFeaturesLUT.push_back(v);
     }
-    vFeaturesLUT.push_back(v);
   }
 }
 
@@ -80,27 +84,32 @@ void KeyFrame::MakeKeyFrame_Rest()
   // creation of the relocaliser's SmallBlurryImage.
   static gvar3<double> gvdCandidateMinSTScore("KF.CandidateMinShiTomasiScore", 70, SILENT);
 
-  vCandidates.clear();
-  for (unsigned int i = 0; i < vFeatures.size(); i++) {
-    Feature& f = vFeatures[i];
-    //Need to get coordinate at scale for each level
-    ImageRef imRef = f.ptRootPos.ir();
-    if (!pyramid[0].im.in_image_with_border(imRef, 4))
-      continue;
-    // .. and then calculate the Shi-Tomasi scores of those, and keep the ones with
-    // a suitably high score as Candidates, i.e. points which the mapmaker will attempt
-    // to make new map points out of.
-    double dSTScore = FindShiTomasiScoreAtPoint(pyramid[0].im, 3, imRef);
 
-    if (dSTScore > *gvdCandidateMinSTScore)
-    {
-      Candidate c;
-      c.ftInd = i;
-      c.dSTScore = dSTScore;
-      vCandidates.push_back(c);
+  for (int l = 0; l < LEVELS; l++) {
+    ScaleSpace &space = pyramid[l];
+    space.vCandidates.clear();
+
+    for (unsigned int i = 0; i < space.vFeatures.size(); i++) {
+      Feature& f = space.vFeatures[i];
+
+      //Compare with lvl 0 as all coordinates are in
+      ImageRef imRef = LevelNPos(f.ptRootPos, space.scale, space.offset).ir();
+      if (!space.im.in_image_with_border(imRef, 4))
+        continue;
+      // .. and then calculate the Shi-Tomasi scores of those, and keep the ones with
+      // a suitably high score as Candidates, i.e. points which the mapmaker will attempt
+      // to make new map points out of.
+      double dSTScore = FindShiTomasiScoreAtPoint(space.im, 3, imRef);
+
+      if (dSTScore > *gvdCandidateMinSTScore)
+      {
+        Candidate c;
+        c.ftInd = i;
+        c.dSTScore = dSTScore;
+        space.vCandidates.push_back(c);
+      }
     }
   }
-
   // Also, make a SmallBlurryImage of the keyframe: The relocaliser uses these.
   pSBI = new SmallBlurryImage(*this);
   // Relocaliser also wants the jacobians..
@@ -117,6 +126,9 @@ ScaleSpace& ScaleSpace::operator=(const ScaleSpace &rhs)
 
   vFeatures = rhs.vFeatures;
   vFeaturesLUT = rhs.vFeaturesLUT;
+
+  scale=rhs.scale;
+  offset=rhs.offset;
   return *this;
 }
 
