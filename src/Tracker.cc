@@ -338,7 +338,7 @@ void Tracker::TrackForInitialMap()
       vector<pair<CVD::Point2f, CVD::Point2f> > vMatches;   // This is the format the mapmaker wants for the stereo pairs
       for (list<Trail>::iterator i = mlTrails.begin(); i != mlTrails.end(); i++)
         vMatches.push_back(pair<Point2f, Point2f>(i->ftInitial.ptRootPos, i->ftCurrent.ptRootPos));
-      //mMapMaker.InitFromStereo(mFirstKF, mCurrentKF, vMatches, mse3CamFromWorld);  // This will take some time!
+      mMapMaker.InitFromStereo(mFirstKF, mCurrentKF, vMatches, mse3CamFromWorld);  // This will take some time!
       mnInitialStage = TRAIL_TRACKING_COMPLETE;
     }
     else
@@ -351,30 +351,30 @@ void Tracker::TrailTracking_Start()
 {
   mCurrentKF.MakeKeyFrame_Rest();  // This populates the Candidates list, which is Shi-Tomasi thresholded.
   mFirstKF = mCurrentKF;
-  
-  vector<pair<double,int> > vCornersAndSTScores; //Vector of corners and SHI TOMASI scores
-  for(unsigned int i=0; i<mCurrentKF.vCandidates.size(); i++)  // Copy candidates into a trivially sortable vector
-  {                                                                     // so that we can choose the image corners with max ST score
-      Candidate &c = mCurrentKF.vCandidates[i];
-      vCornersAndSTScores.push_back(pair<double,int>(-1.0 * c.dSTScore, c.ftInd)); // negative so highest score first in sorted list
+
+  vector<pair<double, int> > vCornersAndSTScores; //Vector of corners and SHI TOMASI scores
+  for (unsigned int i = 0; i < mCurrentKF.vCandidates.size(); i++) // Copy candidates into a trivially sortable vector
+  {
+    // so that we can choose the image corners with max ST score
+    Candidate &c = mCurrentKF.vCandidates[i];
+    // //ignore higher level corner for initialisation
+    // if (mCurrentKF.vFeatures[c.ftInd].octave != 0) 
+    //   continue;
+    vCornersAndSTScores.push_back(pair<double, int>(-1.0 * c.dSTScore, c.ftInd)); // negative so highest score first in sorted list
   };
   sort(vCornersAndSTScores.begin(), vCornersAndSTScores.end());  // Sort according to Shi-Tomasi score
   int nToAdd = GV2.GetInt("Tracker.MaxInitialTrails", 1000, SILENT);
-  for(unsigned int i = 0; i<vCornersAndSTScores.size() && nToAdd > 0; i++)
+  for (unsigned int i = 0; i < vCornersAndSTScores.size() && nToAdd > 0; i++)
   {
-      Trail t;
-      t.ftInitial = mCurrentKF.vFeatures[i];
-      t.ftCurrent = mCurrentKF.vFeatures[i];
-      mlTrails.push_back(t);
-      nToAdd--;
+    Trail t;
+    t.ftInitial = mCurrentKF.vFeatures[i];
+    t.ftCurrent = mCurrentKF.vFeatures[i];
+    mlTrails.push_back(t);
+    nToAdd--;
   }
   mPreviousFrameKF = mFirstKF;  // Always store the previous frame so married-matching can work.
 }
 
-void PrintFeature(const Feature& ft){
-  cout << "x:" << ft.ptRootPos.x;
-  cout << " y:" << ft.ptRootPos.y << endl; 
-}
 // Steady-state trail tracking: Advance from the previous frame, remove duds.
 int Tracker::TrailTracking_Advance()
 {
@@ -391,7 +391,6 @@ int Tracker::TrailTracking_Advance()
   }
 
   static gvar3<unsigned int> gvTrailSearchRange("Tracker.TrailsSearchRange", 15, SILENT);
-
   for (list<Trail>::iterator i = mlTrails.begin(); i != mlTrails.end();)
   {
     list<Trail>::iterator next = i; next++;
@@ -400,30 +399,20 @@ int Tracker::TrailTracking_Advance()
     static gvar3<int> gvnMaxHamming("Tracker.MaxHammingDistance", 100, SILENT);
     //try to match current trail with descriptor in new frame
     static MatchFinder finder = MatchFinder(*gvnMaxHamming);
-    
-    const Feature &ftOrigin= trail.ftCurrent;
+
+    const Feature &ftOrigin = trail.ftCurrent;
     Feature *ftNew, *ftCheck;
     bool mFound = finder.FindMatchCoarse(mCurrentKF, ftOrigin, ftNew, *gvTrailSearchRange);
     //try to look for a match
     if (mFound) {
-      
       //try the other way around see if get same correspondence both ways
       mFound = finder.FindMatchCoarse(mPreviousFrameKF, *ftNew, ftCheck, *gvTrailSearchRange);
 
-      if (mFound&&(ftOrigin.ptRootPos-ftCheck->ptRootPos).mag_squared()>0){
+      if (mFound && (ftOrigin.ptRootPos - ftCheck->ptRootPos).mag_squared() > 0) {
         mFound = false;
       }
-      if(mFound)
+      if (mFound)
       {
-        cout << "Initial:" << endl;
-        PrintFeature(trail.ftInitial);
-        cout << "Source:" << endl;
-        PrintFeature(ftOrigin);
-        cout << "correspondence:" << endl;
-        PrintFeature(*ftNew);
-        cout << "Check:" << endl;
-        PrintFeature(*ftCheck);
-
         //if match found keep descriptor + last known pose up to date.
         trail.ftCurrent = *ftNew;
         nGoodTrails++;
@@ -434,7 +423,7 @@ int Tracker::TrailTracking_Advance()
       if (!mFound)
         glColor3f(0, 1, 1); // Failed trails flash purple before dying.
       else
-        glColor3f(1, 1, 0);      
+        glColor3f(1, 1, 0);
       glVertex(trail.ftInitial.ptRootPos.ir());
       if (mFound) glColor3f(1, 0, 0);
       glVertex(trail.ftCurrent.ptRootPos.ir());
@@ -449,7 +438,8 @@ int Tracker::TrailTracking_Advance()
     glEnd();
 
   mPreviousFrameKF = mCurrentKF;
-  cout << "n good: " << nGoodTrails << endl;
+
+  cout << "Found " << nGoodTrails << " good trails" << endl;
   return nGoodTrails;
 }
 
