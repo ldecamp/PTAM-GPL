@@ -46,11 +46,11 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& mat
   Feature* ftBest = NULL;
 
   for (; i < i_end; i++)       // For each corner ...
-  {  
+  {
     if ( (*i).ptRootPos.x < nLeft || (*i).ptRootPos.x > nRight)
       continue;
 
-    float cMag=(ft.ptRootPos - (*i).ptRootPos).mag_squared();
+    float cMag = (ft.ptRootPos - (*i).ptRootPos).mag_squared();
     if ( cMag > maxRange)
       continue;              // ... reject all those not close enough..
 
@@ -59,7 +59,7 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& mat
 
     if (dist < nBestDist)     // Best yet?
     {
-      ftBest= &(*i);
+      ftBest = &(*i);
       nBestDist = dist;
     }
   } // done looping over corners
@@ -69,7 +69,7 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& mat
     match = ftBest;
     mbFound = true;
   }
-  else{
+  else {
     mbFound = false;
   }
   return mbFound;
@@ -113,7 +113,7 @@ bool MatchFinder::FindMatchCoarse(KeyFrame& kf, const Feature& ft, Feature*& mat
 //   float maxRange = range * range;
 
 //   for (; i < i_end; i++)       // For each corner ...
-//   {  
+//   {
 //     if ( (*i).ptRootPos.x < nLeft || (*i).ptRootPos.x > nRight)
 //       continue;
 

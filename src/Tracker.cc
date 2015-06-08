@@ -358,7 +358,7 @@ void Tracker::TrailTracking_Start()
     // so that we can choose the image corners with max ST score
     Candidate &c = mCurrentKF.vCandidates[i];
     // //ignore higher level corner for initialisation
-    // if (mCurrentKF.vFeatures[c.ftInd].octave != 0) 
+    // if (mCurrentKF.vFeatures[c.ftInd].octave != 0)
     //   continue;
     vCornersAndSTScores.push_back(pair<double, int>(-1.0 * c.dSTScore, c.ftInd)); // negative so highest score first in sorted list
   };

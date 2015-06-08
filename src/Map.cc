@@ -9,7 +9,7 @@ Map::Map()
 
 void Map::Reset()
 {
-  for(unsigned int i=0; i<vpPoints.size(); i++)
+  for (unsigned int i = 0; i < vpPoints.size(); i++)
     delete vpPoints[i];
   vpPoints.clear();
   bGood = false;
@@ -19,20 +19,20 @@ void Map::Reset()
 void Map::MoveBadPointsToTrash()
 {
   int nBad = 0;
-  for(int i = vpPoints.size()-1; i>=0; i--)
+  for (int i = vpPoints.size() - 1; i >= 0; i--)
+  {
+    if (vpPoints[i]->bBad)
     {
-      if(vpPoints[i]->bBad)
-	{
-	  vpPointsTrash.push_back(vpPoints[i]);
-	  vpPoints.erase(vpPoints.begin() + i);
-	  nBad++;
-	}
-    };
+      vpPointsTrash.push_back(vpPoints[i]);
+      vpPoints.erase(vpPoints.begin() + i);
+      nBad++;
+    }
+  };
 };
 
 void Map::EmptyTrash()
 {
-  for(unsigned int i=0; i<vpPointsTrash.size(); i++)
+  for (unsigned int i = 0; i < vpPointsTrash.size(); i++)
     delete vpPointsTrash[i];
   vpPointsTrash.clear();
 };

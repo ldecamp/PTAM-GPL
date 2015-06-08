@@ -8,8 +8,8 @@
 #include <vector>
 #include <TooN/se3.h>
 
-const int N_NOT_TRIED=-1;
-const int N_FAILED=-2;
+const int N_NOT_TRIED = -1;
+const int N_FAILED = -2;
 
 struct CalibGridCorner
 {
@@ -18,16 +18,16 @@ struct CalibGridCorner
     NeighborState() {val = N_NOT_TRIED;}
     int val;
   };
-  
+
   CalibCornerPatch::Params Params;
   CVD::ImageRef irGridPos;
   NeighborState aNeighborStates[4];
-  
-  Matrix<2> GetSteps(std::vector<CalibGridCorner> &vgc); 
+
+  Matrix<2> GetSteps(std::vector<CalibGridCorner> &vgc);
   Matrix<2> mInheritedSteps;
-  
+
   void Draw();
-  
+
   double ExpansionPotential();
 };
 
@@ -44,24 +44,24 @@ public:
   struct ErrorAndJacobians
   {
     Vector<2> v2Error;
-    Matrix<2,6> m26PoseJac;
-    Matrix<2,NUMTRACKERCAMPARAMETERS> m2NCameraJac;
+    Matrix<2, 6> m26PoseJac;
+    Matrix<2, NUMTRACKERCAMPARAMETERS> m2NCameraJac;
   };
 
   std::vector<ErrorAndJacobians> Project(ATANCamera &Camera);
 
   CVD::Image<CVD::byte> mim;
-  
+
 protected:
   std::vector<CVD::ImageRef> mvCorners;
   std::vector<CalibGridCorner> mvGridCorners;
-  
-  
+
+
   bool ExpandByAngle(int nSrc, int nDirn);
   int NextToExpand();
   void ExpandByStep(int n);
   CVD::ImageRef IR_from_dirn(int nDirn);
- 
+
 };
 
 

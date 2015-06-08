@@ -381,7 +381,7 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
 // Operates on a single level of a keyframe.
 void MapMaker::ThinCandidates(KeyFrame &k)
 {
-   //build a list of integer of feature id in the neighbourhood of the map points
+  //build a list of integer of feature id in the neighbourhood of the map points
   //quick and dirty for no optimize when working
 
   const vector<Feature> &vFeat = k.vFeatures;
@@ -549,7 +549,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   // v2RootPos[0] = irLevelPos[0];
   // v2RootPos[1] = irLevelPos[1];
 
-  Vector<2> v2RootPos=feat.ptRootPos.vec();
+  Vector<2> v2RootPos = feat.ptRootPos.vec();
 
   Vector<3> v3Ray_SC = unproject(mCamera.UnProject(v2RootPos));
   normalize(v3Ray_SC);
@@ -635,7 +635,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   }
 
   if (nBest == -1)   return false;  // Nothing found.
-  
+
   Vector<2> v2Best = vIR[nBest].ptRootPos.vec();
 
   //Check if need to keep subpixel localisation since brisk does it anyway

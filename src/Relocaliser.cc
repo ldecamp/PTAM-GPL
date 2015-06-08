@@ -22,25 +22,25 @@ SE3<> Relocaliser::BestPose()
 bool Relocaliser::AttemptRecovery(KeyFrame &kCurrent)
 {
   // Ensure the incoming frame has a SmallBlurryImage attached
-  if(!kCurrent.pSBI)
+  if (!kCurrent.pSBI)
     kCurrent.pSBI = new SmallBlurryImage(kCurrent);
   else
     kCurrent.pSBI->MakeFromKF(kCurrent);
-  
+
   // Find the best ZMSSD match from all keyframes in map
   ScoreKFs(kCurrent);
 
   // And estimate a camera rotation from a 3DOF image alignment
   pair<SE2<>, double> result_pair = kCurrent.pSBI->IteratePosRelToTarget(*mMap.vpKeyFrames[mnBest]->pSBI, 6);
   mse2 = result_pair.first;
-  double dScore =result_pair.second;
-  
+  double dScore = result_pair.second;
+
   SE3<> se3KeyFramePos = mMap.vpKeyFrames[mnBest]->se3CfromW;
   mse3Best = SmallBlurryImage::SE3fromSE2(mse2, mCamera) * se3KeyFramePos;
-  
-  if(dScore < GV2.GetDouble("Reloc2.MaxScore", 9e6, SILENT))
+
+  if (dScore < GV2.GetDouble("Reloc2.MaxScore", 9e6, SILENT))
     return true;
-  else 
+  else
     return false;
 };
 
@@ -50,15 +50,15 @@ void Relocaliser::ScoreKFs(KeyFrame &kCurrent)
 {
   mdBestScore = 99999999999999.9;
   mnBest = -1;
-  
-  for(unsigned int i=0; i<mMap.vpKeyFrames.size(); i++)
+
+  for (unsigned int i = 0; i < mMap.vpKeyFrames.size(); i++)
+  {
+    double dSSD = kCurrent.pSBI->ZMSSD(*mMap.vpKeyFrames[i]->pSBI);
+    if (dSSD < mdBestScore)
     {
-      double dSSD = kCurrent.pSBI->ZMSSD(*mMap.vpKeyFrames[i]->pSBI);
-      if(dSSD < mdBestScore)
-	{
-	  mdBestScore = dSSD;
-	  mnBest = i;
-	}
+      mdBestScore = dSSD;
+      mnBest = i;
     }
+  }
 }
 

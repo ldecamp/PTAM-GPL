@@ -6,8 +6,8 @@
 #include <gvars3/instances.h>
 
 #include <cvd/image_io.h>
-#include <cvd/videodisplay.h>   
-#include <cvd/gl_helpers.h> 
+#include <cvd/videodisplay.h>
+#include <cvd/gl_helpers.h>
 #include <unistd.h>
 
 using namespace CVD;
@@ -18,7 +18,7 @@ VideoSource::VideoSource()
 {
   cout << "  VideoSource_Linux: Opening video source..." << endl;
   string QuickCamFile = GV3::get<string>("VideoSource.V4LDevice", "/dev/video0");
-  ImageRef irSize = GV3::get<ImageRef>("VideoSource.Resolution", ImageRef(640,480));
+  ImageRef irSize = GV3::get<ImageRef>("VideoSource.Resolution", ImageRef(640, 480));
   int nFrameRate = GV3::get<int>("VideoSource.Framerate", 30);
   V4LBuffer<yuv422>* pvb = new V4LBuffer<yuv422>(QuickCamFile, irSize, -1, false, nFrameRate);
   mirSize = pvb->size();
@@ -27,7 +27,7 @@ VideoSource::VideoSource()
 };
 
 ImageRef VideoSource::Size()
-{ 
+{
   return mirSize;
 };
 

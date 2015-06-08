@@ -10,14 +10,14 @@ using namespace std;
 VideoSource::VideoSource()
 {
   cout << "  VideoSource_Linux: Opening video source..." << endl;
-  DVBuffer3<yuv411>* pvb= new DVBuffer3<yuv411>();
+  DVBuffer3<yuv411>* pvb = new DVBuffer3<yuv411>();
   mptr = pvb;
   mirSize = pvb->size();
   cout << "  ... got video source." << endl;
 };
 
 ImageRef VideoSource::Size()
-{ 
+{
   return mirSize;
 };
 

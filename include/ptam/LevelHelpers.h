@@ -36,7 +36,7 @@ inline Vector<2> LevelZeroPos(Vector<2> v2LevelPos, int nLevel)
   v2Ans[1] = LevelZeroPos(v2LevelPos[1], nLevel);
   return v2Ans;
 }
-inline Vector<2> LevelZeroPos(CVD::ImageRef irLevelPos, int nLevel) 
+inline Vector<2> LevelZeroPos(CVD::ImageRef irLevelPos, int nLevel)
 {
   Vector<2> v2Ans;
   v2Ans[0] = LevelZeroPos(irLevelPos.x, nLevel);

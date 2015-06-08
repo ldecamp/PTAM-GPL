@@ -42,8 +42,8 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
     ScaleSpace &space = pyramid[i];
     space.im.resize(briskScaleSpace.getPyramid()[i].img().size());
     copy(briskScaleSpace.getPyramid()[i].img(), space.im);
-    space.scale=briskScaleSpace.getPyramid()[i].scale();
-    space.offset=briskScaleSpace.getPyramid()[i].offset();
+    space.scale = briskScaleSpace.getPyramid()[i].scale();
+    space.offset = briskScaleSpace.getPyramid()[i].offset();
   }
 
   extractor.setImage(im);

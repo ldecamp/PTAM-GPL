@@ -62,76 +62,76 @@ static ImageRef mFrameSize(GST_MAX_WIDTH, GST_MAX_HEIGHT);
  */
 VideoSource::VideoSource()
 {
-    gchar *pipelineString = NULL;
-    mFrameNumber = 0;
-    mRgbVideoSink = mGrayVideoSink = NULL;
+  gchar *pipelineString = NULL;
+  mFrameNumber = 0;
+  mRgbVideoSink = mGrayVideoSink = NULL;
 
-    /*!
-     * Retrieve the name of the video source file from settings.cfg.
-     */
-    string videoSourceFile = GVars3::GV2.GetString("GStreamerVideoFilename",
-            GST_DEFAULT_VIDEO_SOURCE_FILE_NAME);
+  /*!
+   * Retrieve the name of the video source file from settings.cfg.
+   */
+  string videoSourceFile = GVars3::GV2.GetString("GStreamerVideoFilename",
+                           GST_DEFAULT_VIDEO_SOURCE_FILE_NAME);
 
-     /*!
-      * Initialize the gstreamer library, without the command-line parms.
-      */
-    gst_init(NULL, NULL);
+  /*!
+   * Initialize the gstreamer library, without the command-line parms.
+   */
+  gst_init(NULL, NULL);
 
-    /*!
-     * Setup the source pipeline to read from a file, automatically select the proper decoder,
-     * convert each frame to two new color spaces (specified later), scale the video (specified later),
-     * filter capabilities to RGB and Gray level at 640x480 (used by the previous color space and scale filters),
-     * and finally send the result to separate sink filters which will allow access to the resulting
-     * RGB and Gray level video data (limited to 2 buffers).
-     */
-    pipelineString =
-        g_strdup_printf(
-            "filesrc location=\"%s\" ! "
-             "decodebin ! "
-             "tee ! "
-             "ffmpegcolorspace ! "
-             "videoscale ! "
-             "video/x-raw-rgb,width=%d,height=%d ! "
-             "queue ! "
-             "appsink name=rgbvideo max-buffers=2 drop=false tee0. ! "
-             "queue ! "
-             "ffmpegcolorspace ! "
-             "videoscale ! "
-             "video/x-raw-gray,width=%d,height=%d ! "
-             "appsink name=grayvideo max-buffers=2 drop=false",
-            videoSourceFile.c_str(), GST_MAX_WIDTH, GST_MAX_HEIGHT, GST_MAX_WIDTH, GST_MAX_HEIGHT);
-    g_print("gstreamer pipeline:\n%s\n", pipelineString);
-    mSourcePipeline = gst_parse_launch(pipelineString, NULL);
-    g_free(pipelineString);
+  /*!
+   * Setup the source pipeline to read from a file, automatically select the proper decoder,
+   * convert each frame to two new color spaces (specified later), scale the video (specified later),
+   * filter capabilities to RGB and Gray level at 640x480 (used by the previous color space and scale filters),
+   * and finally send the result to separate sink filters which will allow access to the resulting
+   * RGB and Gray level video data (limited to 2 buffers).
+   */
+  pipelineString =
+    g_strdup_printf(
+      "filesrc location=\"%s\" ! "
+      "decodebin ! "
+      "tee ! "
+      "ffmpegcolorspace ! "
+      "videoscale ! "
+      "video/x-raw-rgb,width=%d,height=%d ! "
+      "queue ! "
+      "appsink name=rgbvideo max-buffers=2 drop=false tee0. ! "
+      "queue ! "
+      "ffmpegcolorspace ! "
+      "videoscale ! "
+      "video/x-raw-gray,width=%d,height=%d ! "
+      "appsink name=grayvideo max-buffers=2 drop=false",
+      videoSourceFile.c_str(), GST_MAX_WIDTH, GST_MAX_HEIGHT, GST_MAX_WIDTH, GST_MAX_HEIGHT);
+  g_print("gstreamer pipeline:\n%s\n", pipelineString);
+  mSourcePipeline = gst_parse_launch(pipelineString, NULL);
+  g_free(pipelineString);
 
-    if (mSourcePipeline == NULL)
-    {
-        g_print("An error occurred when attempting to create the video source pipeline.\n");
-        return;
-    }
-    /*!
-     * Obtain a reference to the appsink element in the pipeline for later use when pulling a buffer.
-     */
-    mRgbVideoSink = gst_bin_get_by_name(GST_BIN(mSourcePipeline), "rgbvideo");
-    mGrayVideoSink = gst_bin_get_by_name(GST_BIN(mSourcePipeline), "grayvideo");
+  if (mSourcePipeline == NULL)
+  {
+    g_print("An error occurred when attempting to create the video source pipeline.\n");
+    return;
+  }
+  /*!
+   * Obtain a reference to the appsink element in the pipeline for later use when pulling a buffer.
+   */
+  mRgbVideoSink = gst_bin_get_by_name(GST_BIN(mSourcePipeline), "rgbvideo");
+  mGrayVideoSink = gst_bin_get_by_name(GST_BIN(mSourcePipeline), "grayvideo");
 
-    if (mRgbVideoSink == NULL || mGrayVideoSink == NULL)
-    {
-        g_print("The video sink filters could not be created.\n");
-        gst_object_unref(mSourcePipeline);
-        mSourcePipeline = NULL;
-        return;
-    }
-    /*!
-     * Activate the video source pipeline, so it is ready when we request a buffer.
-     */
-    gst_element_set_state(mSourcePipeline, GST_STATE_PLAYING);
+  if (mRgbVideoSink == NULL || mGrayVideoSink == NULL)
+  {
+    g_print("The video sink filters could not be created.\n");
+    gst_object_unref(mSourcePipeline);
+    mSourcePipeline = NULL;
+    return;
+  }
+  /*!
+   * Activate the video source pipeline, so it is ready when we request a buffer.
+   */
+  gst_element_set_state(mSourcePipeline, GST_STATE_PLAYING);
 }
 
 /*!
  * Destructructor for the VideoSource class.
  */
- 
+
 /*VideoSource::~VideoSource()
 {
     if (mSourcePipeline != NULL)
@@ -150,8 +150,8 @@ VideoSource::VideoSource()
  * functions.
  */
 ImageRef VideoSource::Size()
-{ 
-    return mFrameSize;
+{
+  return mFrameSize;
 }
 
 /*!
@@ -166,37 +166,37 @@ ImageRef VideoSource::Size()
  */
 void VideoSource::GetAndFillFrameBWandRGB(Image<byte> &imBW, Image<Rgb<byte> > &imRGB)
 {
-    GstBuffer *rgbVideoBuffer = NULL;
-    GstBuffer *grayVideoBuffer = NULL;
+  GstBuffer *rgbVideoBuffer = NULL;
+  GstBuffer *grayVideoBuffer = NULL;
+
+  /*!
+   * Be sure the video sinks are available before requesting a buffer with video
+   * data.
+   */
+  if (mRgbVideoSink != NULL && mGrayVideoSink != NULL)
+  {
+    rgbVideoBuffer = gst_app_sink_pull_buffer(GST_APP_SINK(mRgbVideoSink));
+    grayVideoBuffer = gst_app_sink_pull_buffer(GST_APP_SINK(mGrayVideoSink));
 
     /*!
-     * Be sure the video sinks are available before requesting a buffer with video
-     * data.
+     * If either of the buffers are NULL then assume that we have reached the end of
+     * the video stream and just return.
      */
-    if (mRgbVideoSink != NULL && mGrayVideoSink != NULL)
+    if (rgbVideoBuffer != NULL && grayVideoBuffer != NULL)
     {
-        rgbVideoBuffer = gst_app_sink_pull_buffer(GST_APP_SINK(mRgbVideoSink));
-        grayVideoBuffer = gst_app_sink_pull_buffer(GST_APP_SINK(mGrayVideoSink));
+      BasicImage<Rgb<byte> > rgbVideoFrame((Rgb<byte> *)rgbVideoBuffer->data, mFrameSize);
+      BasicImage<byte> grayVideoFrame((byte *)grayVideoBuffer->data, mFrameSize);
 
-        /*!
-         * If either of the buffers are NULL then assume that we have reached the end of
-         * the video stream and just return.
-         */
-        if (rgbVideoBuffer != NULL && grayVideoBuffer != NULL)
-        {
-            BasicImage<Rgb<byte> > rgbVideoFrame((Rgb<byte> *)rgbVideoBuffer->data, mFrameSize);
-            BasicImage<byte> grayVideoFrame((byte *)grayVideoBuffer->data, mFrameSize);
+      /* Copy the streamed image into caller's params. */
+      imRGB.copy_from(rgbVideoFrame);
+      imBW.copy_from(grayVideoFrame);
 
-            /* Copy the streamed image into caller's params. */
-            imRGB.copy_from(rgbVideoFrame);
-            imBW.copy_from(grayVideoFrame);
+      /* Release the gst buffer since it is already copied to the caller. */
+      gst_buffer_unref(rgbVideoBuffer);
+      gst_buffer_unref(grayVideoBuffer);
 
-            /* Release the gst buffer since it is already copied to the caller. */
-            gst_buffer_unref(rgbVideoBuffer);
-            gst_buffer_unref(grayVideoBuffer);
-
-            /* Maintain the running total of frames. */
-            mFrameNumber++;
-        }
+      /* Maintain the running total of frames. */
+      mFrameNumber++;
     }
+  }
 }
