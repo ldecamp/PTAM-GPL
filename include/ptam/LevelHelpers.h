@@ -11,6 +11,7 @@
 #include <TooN/TooN.h>
 using namespace TooN;
 #include <cvd/image_ref.h>
+#include <brisk/keyPoint.hpp>
 
 // Set of global colours useful for drawing stuff:
 extern Vector<3> gavLevelColors[];
@@ -36,7 +37,7 @@ inline Vector<2> LevelZeroPos(Vector<2> v2LevelPos, int nLevel)
   v2Ans[1] = LevelZeroPos(v2LevelPos[1], nLevel);
   return v2Ans;
 }
-inline Vector<2> LevelZeroPos(CVD::ImageRef irLevelPos, int nLevel) 
+inline Vector<2> LevelZeroPos(CVD::ImageRef irLevelPos, int nLevel)
 {
   Vector<2> v2Ans;
   v2Ans[0] = LevelZeroPos(irLevelPos.x, nLevel);
@@ -59,4 +60,12 @@ inline Vector<2> LevelNPos(Vector<2> v2RootPos, int nLevel)
   return v2Ans;
 }
 
+inline float LevelNPos(float lvl0Pos, float scale, float offset) {
+  return lvl0Pos / scale - offset;
+}
+
+inline CVD::Point2f LevelNPos(CVD::Point2f lvl0Pos, float scale, float offset) {
+  return CVD::Point2f(LevelNPos(lvl0Pos.x, scale, offset),
+                 LevelNPos(lvl0Pos.y, scale, offset));
+}
 #endif

@@ -67,6 +67,9 @@ struct Level
   
   bool bImplaneCornersCached;           // Also keep image-plane (z=1) positions of FAST corners to speed up epipolar search
   std::vector<Vector<2> > vImplaneCorners; // Corner points un-projected into z=1-plane coordinates
+
+  float scale;
+  float offset;
 };
 
 // The actual KeyFrame struct. The map contains of a bunch of these. However, the tracker uses this
