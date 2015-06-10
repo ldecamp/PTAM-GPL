@@ -38,11 +38,12 @@ struct MapMakerData
 struct MatchesData{
   CVD::Point2f source;
   CVD::Point2f match;
+  unsigned char* descriptor;
   int octave;
 
   inline MatchesData(){}
-  inline MatchesData(CVD::Point2f src, CVD::Point2f mtch, int oct)
-    : source(src), match(mtch), octave(oct){ }
+  inline MatchesData(CVD::Point2f src, CVD::Point2f mtch, unsigned char* descriptor_, int oct)
+    : source(src), match(mtch), descriptor(descriptor_), octave(oct){ }
 };  
 
 // MapMaker dervives from CVD::Thread, so everything in void run() is its own thread.

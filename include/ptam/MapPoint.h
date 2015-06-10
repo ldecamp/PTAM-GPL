@@ -35,6 +35,7 @@ struct MapPoint
     nMEstimatorOutlierCount = 0;
     nMEstimatorInlierCount = 0;
     dCreationTime = CVD::timer.get_time();
+    descriptor=NULL;
   };
 
   // Where in the world is this point? The main bit of information, really.
@@ -45,8 +46,10 @@ struct MapPoint
   // What pixels should be used to search for this point?
   KeyFrame *pPatchSourceKF; // The KeyFrame the point was originally made in
   int nSourceLevel;         // Pyramid level in source KeyFrame
-  //Might Need to change this to Point2f
-  //CVD::Point2f irCenter;
+  
+  unsigned char* descriptor; //store information about brisk descriptor for map point
+  
+
   CVD::ImageRef irCenter;   // This is in level-coords in the source pyramid level
 
 

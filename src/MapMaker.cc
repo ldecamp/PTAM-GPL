@@ -284,6 +284,8 @@ bool MapMaker::InitFromStereo(KeyFrame &kF,
     MapPoint *p = new MapPoint();
 
     Point2f first = vTrailMatches[i].source;
+
+    p->descriptor = vTrailMatches[i].descriptor;
     // Patch source stuff:
     p->pPatchSourceKF = pkFirst;
     p->nSourceLevel = vTrailMatches[i].octave;
@@ -598,7 +600,7 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   }
 
   int nBest = -1;
-  int nBestDist = 6;
+  int nBestDist = 20;
   double dMaxDistDiff = mCamera.OnePixelDist() * (4.0 + 1.0 * nLevelScale);
   double dMaxDistSq = dMaxDistDiff * dMaxDistDiff;
 
@@ -647,6 +649,9 @@ bool MapMaker::AddPointEpipolar(KeyFrame &kSrc,
   MapPoint *pNew = new MapPoint;
   pNew->v3WorldPos = v3New;
   pNew->pMMData = new MapMakerData();
+
+  //descriptor 
+  pNew->descriptor = feat.descriptor;
 
   // Patch source stuff:
   pNew->pPatchSourceKF = &kSrc;

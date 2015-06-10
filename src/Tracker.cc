@@ -340,6 +340,7 @@ void Tracker::TrackForInitialMap()
         vMatches.push_back(MatchesData(
                              i->ftInitial.ptRootPos,
                              i->ftCurrent.ptRootPos,
+                             i->ftInitial.descriptor,
                              i->octave));
       mMapMaker.InitFromStereo(mFirstKF, mCurrentKF, vMatches, mse3CamFromWorld);  // This will take some time!
       mnInitialStage = TRAIL_TRACKING_COMPLETE;
@@ -479,306 +480,307 @@ int Tracker::TrailTracking_Advance()
 // class PatchFinder finds a projected MapPoint in the current-frame-KeyFrame.
 void Tracker::TrackMap()
 {
-  // // Some accounting which will be used for tracking quality assessment:
-  // for (int i = 0; i < LEVELS; i++)
-  //   manMeasAttempted[i] = manMeasFound[i] = 0;
+  // Some accounting which will be used for tracking quality assessment:
+  for (int i = 0; i < LEVELS; i++)
+    manMeasAttempted[i] = manMeasFound[i] = 0;
 
-  // // The Potentially-Visible-Set (PVS) is split into pyramid levels.
-  // vector<TrackerData*> avPVS[LEVELS];
-  // for (int i = 0; i < LEVELS; i++)
-  //   avPVS[i].reserve(500);
+  // The Potentially-Visible-Set (PVS) is split into pyramid levels.
+  vector<TrackerData*> avPVS[LEVELS];
+  for (int i = 0; i < LEVELS; i++)
+    avPVS[i].reserve(500);
 
-  // // For all points in the map..
-  // for (unsigned int i = 0; i < mMap.vpPoints.size(); i++)
-  // {
-  //   MapPoint &p = *(mMap.vpPoints[i]);
-  //   // Ensure that this map point has an associated TrackerData struct.
-  //   if (!p.pTData) p.pTData = new TrackerData(&p);
-  //   TrackerData &TData = *p.pTData;
+  // For all points in the map..
+  for (unsigned int i = 0; i < mMap.vpPoints.size(); i++)
+  {
+    MapPoint &p = *(mMap.vpPoints[i]);
+    // Ensure that this map point has an associated TrackerData struct.
+    if (!p.pTData) p.pTData = new TrackerData(&p);
+    TrackerData &TData = *p.pTData;
 
-  //   // Project according to current view, and if it's not in the image, skip.
-  //   TData.Project(mse3CamFromWorld, mCamera);
-  //   if (!TData.bInImage)
-  //     continue;
+    // Project according to current view, and if it's not in the image, skip.
+    TData.Project(mse3CamFromWorld, mCamera);
+    if (!TData.bInImage)
+      continue;
 
-  //   // Calculate camera projection derivatives of this point.
-  //   TData.GetDerivsUnsafe(mCamera);
+    // Calculate camera projection derivatives of this point.
+    TData.GetDerivsUnsafe(mCamera);
 
-  //   // And check what the PatchFinder (included in TrackerData) makes of the mappoint in this view..
-  //   TData.nSearchLevel = TData.Finder.CalcSearchLevelAndWarpMatrix(TData.Point, mse3CamFromWorld, TData.m2CamDerivs);
-  //   if (TData.nSearchLevel == -1)
-  //     continue;   // a negative search pyramid level indicates an inappropriate warp for this view, so skip.
+    // And check what the PatchFinder (included in TrackerData) makes of the mappoint in this view..
+    TData.nSearchLevel = TData.Finder.CalcSearchLevelAndWarpMatrix(TData.Point, mse3CamFromWorld, TData.m2CamDerivs);
+    if (TData.nSearchLevel == -1)
+      continue;   // a negative search pyramid level indicates an inappropriate warp for this view, so skip.
 
-  //   // Otherwise, this point is suitable to be searched in the current image! Add to the PVS.
-  //   TData.bSearched = false;
-  //   TData.bFound = false;
-  //   avPVS[TData.nSearchLevel].push_back(&TData);
-  // };
+    // Otherwise, this point is suitable to be searched in the current image! Add to the PVS.
+    TData.bSearched = false;
+    TData.bFound = false;
+    avPVS[TData.nSearchLevel].push_back(&TData);
+  };
 
-  // // Next: A large degree of faffing about and deciding which points are going to be measured!
-  // // First, randomly shuffle the individual levels of the PVS.
-  // for (int i = 0; i < LEVELS; i++)
-  //   random_shuffle(avPVS[i].begin(), avPVS[i].end());
+  // Next: A large degree of faffing about and deciding which points are going to be measured!
+  // First, randomly shuffle the individual levels of the PVS.
+  for (int i = 0; i < LEVELS; i++)
+    random_shuffle(avPVS[i].begin(), avPVS[i].end());
 
-  // // The next two data structs contain the list of points which will next
-  // // be searched for in the image, and then used in pose update.
-  // vector<TrackerData*> vNextToSearch;
-  // vector<TrackerData*> vIterationSet;
+  // The next two data structs contain the list of points which will next
+  // be searched for in the image, and then used in pose update.
+  vector<TrackerData*> vNextToSearch;
+  vector<TrackerData*> vIterationSet;
 
-  // // Tunable parameters to do with the coarse tracking stage:
-  // static gvar3<unsigned int> gvnCoarseMin("Tracker.CoarseMin", 20, SILENT);   // Min number of large-scale features for coarse stage
-  // static gvar3<unsigned int> gvnCoarseMax("Tracker.CoarseMax", 60, SILENT);   // Max number of large-scale features for coarse stage
-  // static gvar3<unsigned int> gvnCoarseRange("Tracker.CoarseRange", 30, SILENT);       // Pixel search radius for coarse features
-  // static gvar3<int> gvnCoarseSubPixIts("Tracker.CoarseSubPixIts", 8, SILENT); // Max sub-pixel iterations for coarse features
-  // static gvar3<int> gvnCoarseDisabled("Tracker.DisableCoarse", 0, SILENT);    // Set this to 1 to disable coarse stage (except after recovery)
-  // static gvar3<double> gvdCoarseMinVel("Tracker.CoarseMinVelocity", 0.006, SILENT);  // Speed above which coarse stage is used.
+  // Tunable parameters to do with the coarse tracking stage:
+  static gvar3<unsigned int> gvnCoarseMin("Tracker.CoarseMin", 20, SILENT);   // Min number of large-scale features for coarse stage
+  static gvar3<unsigned int> gvnCoarseMax("Tracker.CoarseMax", 60, SILENT);   // Max number of large-scale features for coarse stage
+  static gvar3<unsigned int> gvnCoarseRange("Tracker.CoarseRange", 30, SILENT);       // Pixel search radius for coarse features
+  static gvar3<int> gvnCoarseSubPixIts("Tracker.CoarseSubPixIts", 8, SILENT); // Max sub-pixel iterations for coarse features
+  static gvar3<int> gvnCoarseDisabled("Tracker.DisableCoarse", 0, SILENT);    // Set this to 1 to disable coarse stage (except after recovery)
+  static gvar3<double> gvdCoarseMinVel("Tracker.CoarseMinVelocity", 0.006, SILENT);  // Speed above which coarse stage is used.
 
-  // unsigned int nCoarseMax = *gvnCoarseMax;
-  // unsigned int nCoarseRange = *gvnCoarseRange;
+  unsigned int nCoarseMax = *gvnCoarseMax;
+  unsigned int nCoarseRange = *gvnCoarseRange;
 
-//  mbDidCoarse = false;
+  mbDidCoarse = false;
 
-//  // Set of heuristics to check if we should do a coarse tracking stage.
-//  bool bTryCoarse = true;
-//  if(*gvnCoarseDisabled ||
-//   mdMSDScaledVelocityMagnitude < *gvdCoarseMinVel  ||
-//   nCoarseMax == 0)
-//    bTryCoarse = false;
-//  if(mbJustRecoveredSoUseCoarse)
-//  {
-//    bTryCoarse = true;
-//    nCoarseMax *=2;
-//    nCoarseRange *=2;
-//    mbJustRecoveredSoUseCoarse = false;
-//  };
+// Set of heuristics to check if we should do a coarse tracking stage.
+  bool bTryCoarse = true;
+  if (*gvnCoarseDisabled ||
+      mdMSDScaledVelocityMagnitude < *gvdCoarseMinVel  ||
+      nCoarseMax == 0)
+    bTryCoarse = false;
+  if (mbJustRecoveredSoUseCoarse)
+  {
+    bTryCoarse = true;
+    nCoarseMax *= 2;
+    nCoarseRange *= 2;
+    mbJustRecoveredSoUseCoarse = false;
+  };
 
-//  // If we do want to do a coarse stage, also check that there's enough high-level
-//  // PV map points. We use the lowest-res two pyramid levels (LEVELS-1 and LEVELS-2),
-//  // with preference to LEVELS-1.
-//  if(bTryCoarse && avPVS[LEVELS-1].size() + avPVS[LEVELS-2].size() > *gvnCoarseMin )
-//  {
-//      // Now, fill the vNextToSearch struct with an appropriate number of
-//      // TrackerDatas corresponding to coarse map points! This depends on how many
-//      // there are in different pyramid levels compared to CoarseMin and CoarseMax.
+// If we do want to do a coarse stage, also check that there's enough high-level
+// PV map points. We use the lowest-res two pyramid levels (LEVELS-1 and LEVELS-2),
+// with preference to LEVELS-1.
+  if (bTryCoarse && avPVS[LEVELS - 1].size() + avPVS[LEVELS - 2].size() > *gvnCoarseMin )
+  {
+    // Now, fill the vNextToSearch struct with an appropriate number of
+    // TrackerDatas corresponding to coarse map points! This depends on how many
+    // there are in different pyramid levels compared to CoarseMin and CoarseMax.
 
-//    if(avPVS[LEVELS-1].size() <= nCoarseMax)
-  //   { // Fewer than CoarseMax in LEVELS-1? then take all of them, and remove them from the PVS list.
-//      vNextToSearch = avPVS[LEVELS-1];
-//      avPVS[LEVELS-1].clear();
-//    }
-//    else
-  //   { // ..otherwise choose nCoarseMax at random, again removing from the PVS list.
-//      for(unsigned int i=0; i<nCoarseMax; i++)
-//        vNextToSearch.push_back(avPVS[LEVELS-1][i]);
-//      avPVS[LEVELS-1].erase(avPVS[LEVELS-1].begin(), avPVS[LEVELS-1].begin() + nCoarseMax);
-//    }
+    if (avPVS[LEVELS - 1].size() <= nCoarseMax)
+    { // Fewer than CoarseMax in LEVELS-1? then take all of them, and remove them from the PVS list.
+      vNextToSearch = avPVS[LEVELS - 1];
+      avPVS[LEVELS - 1].clear();
+    }
+    else
+    { // ..otherwise choose nCoarseMax at random, again removing from the PVS list.
+      for (unsigned int i = 0; i < nCoarseMax; i++)
+        vNextToSearch.push_back(avPVS[LEVELS - 1][i]);
+      avPVS[LEVELS - 1].erase(avPVS[LEVELS - 1].begin(), avPVS[LEVELS - 1].begin() + nCoarseMax);
+    }
 
-//    // If didn't source enough from LEVELS-1, get some from LEVELS-2... same as above.
-//    if(vNextToSearch.size() < nCoarseMax)
-//    {
-//      unsigned int nMoreCoarseNeeded = nCoarseMax - vNextToSearch.size();
-//      if(avPVS[LEVELS-2].size() <= nMoreCoarseNeeded)
-//      {
-//        vNextToSearch = avPVS[LEVELS-2];
-//        avPVS[LEVELS-2].clear();
-//      }
-//      else
-//      {
-//        for(unsigned int i=0; i<nMoreCoarseNeeded; i++)
-//          vNextToSearch.push_back(avPVS[LEVELS-2][i]);
-//        avPVS[LEVELS-2].erase(avPVS[LEVELS-2].begin(), avPVS[LEVELS-2].begin() + nMoreCoarseNeeded);
-//      }
-//    }
+    // If didn't source enough from LEVELS-1, get some from LEVELS-2... same as above.
+    if (vNextToSearch.size() < nCoarseMax)
+    {
+      unsigned int nMoreCoarseNeeded = nCoarseMax - vNextToSearch.size();
+      if (avPVS[LEVELS - 2].size() <= nMoreCoarseNeeded)
+      {
+        vNextToSearch = avPVS[LEVELS - 2];
+        avPVS[LEVELS - 2].clear();
+      }
+      else
+      {
+        for (unsigned int i = 0; i < nMoreCoarseNeeded; i++)
+          vNextToSearch.push_back(avPVS[LEVELS - 2][i]);
+        avPVS[LEVELS - 2].erase(avPVS[LEVELS - 2].begin(), avPVS[LEVELS - 2].begin() + nMoreCoarseNeeded);
+      }
+    }
 
-//    // Now go and attempt to find these points in the image!
-//    unsigned int nFound = SearchForPoints(vNextToSearch, nCoarseRange, *gvnCoarseSubPixIts);
-//    vIterationSet = vNextToSearch;  // Copy over into the to-be-optimised list.
+    // Now go and attempt to find these points in the image!
+    unsigned int nFound = SearchForPoints(vNextToSearch, nCoarseRange, *gvnCoarseSubPixIts);
 
-//    if(nFound >= *gvnCoarseMin)  // Were enough found to do any meaningful optimisation?
-//    {
-//      mbDidCoarse = true;
-  //     for(int iter = 0; iter<10; iter++) // If so: do ten Gauss-Newton pose updates iterations.
-//      {
-//        if(iter != 0)
-  //      { // Re-project the points on all but the first iteration.
-//          for(unsigned int i=0; i<vIterationSet.size(); i++)
-//          if(vIterationSet[i]->bFound)
-//            vIterationSet[i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
-//        }
+    vIterationSet = vNextToSearch;  // Copy over into the to-be-optimised list.
 
-//        for(unsigned int i=0; i<vIterationSet.size(); i++)
-//        if(vIterationSet[i]->bFound)
-//          vIterationSet[i]->CalcJacobian();
-//        double dOverrideSigma = 0.0;
-  //       // Hack: force the MEstimator to be pretty brutal
-  //       // with outliers beyond the fifth iteration.
-//        if(iter > 5)
-//          dOverrideSigma = 1.0;
+    if (nFound >= *gvnCoarseMin) // Were enough found to do any meaningful optimisation?
+    {
+      mbDidCoarse = true;
+      for (int iter = 0; iter < 10; iter++) // If so: do ten Gauss-Newton pose updates iterations.
+      {
+        if (iter != 0)
+        { // Re-project the points on all but the first iteration.
+          for (unsigned int i = 0; i < vIterationSet.size(); i++)
+            if (vIterationSet[i]->bFound)
+              vIterationSet[i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
+        }
 
-  //       // Calculate and apply the pose update...
-//        Vector<6> v6Update =
-//        CalcPoseUpdate(vIterationSet, dOverrideSigma);
-//        mse3CamFromWorld = SE3<>::exp(v6Update) * mse3CamFromWorld;
-//      };
-//    }
-//  };
+        for (unsigned int i = 0; i < vIterationSet.size(); i++)
+          if (vIterationSet[i]->bFound)
+            vIterationSet[i]->CalcJacobian();
+        double dOverrideSigma = 0.0;
+        // Hack: force the MEstimator to be pretty brutal
+        // with outliers beyond the fifth iteration.
+        if (iter > 5)
+          dOverrideSigma = 1.0;
 
-//  // So, at this stage, we may or may not have done a coarse tracking stage.
-//  // Now do the fine tracking stage. This needs many more points!
-//  static gvar3<int> gvdFineRange("Tracker.SearchRangeFine", 10, SILENT);  // Pixel search range for the fine stage.
-//  static gvar3<int> gvdFineRangeAndCoarse("Tracker.SearchRangeFineAndCoarse", 5, SILENT);   // Can use a tighter search if the coarse stage was already done.
+        // Calculate and apply the pose update...
+        Vector<6> v6Update =
+          CalcPoseUpdate(vIterationSet, dOverrideSigma);
+        mse3CamFromWorld = SE3<>::exp(v6Update) * mse3CamFromWorld;
+      };
+    }
+  };
 
-//  int nFineRange = *gvdFineRange;  // Pixel search range for the fine stage.
-//  if(mbDidCoarse)       // Can use a tighter search if the coarse stage was already done.
-//    nFineRange = *gvdFineRangeAndCoarse;
+// So, at this stage, we may or may not have done a coarse tracking stage.
+// Now do the fine tracking stage. This needs many more points!
+  static gvar3<int> gvdFineRange("Tracker.SearchRangeFine", 10, SILENT);  // Pixel search range for the fine stage.
+  static gvar3<int> gvdFineRangeAndCoarse("Tracker.SearchRangeFineAndCoarse", 5, SILENT);   // Can use a tighter search if the coarse stage was already done.
 
-//  // What patches shall we use this time? The high-level ones are quite important,
-//  // so do all of these, with sub-pixel refinement.
-//  {
-//    int l = LEVELS - 1;
-//    for(unsigned int i=0; i<avPVS[l].size(); i++)
-//      avPVS[l][i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
-//    SearchForPoints(avPVS[l], nFineRange, 8);
-//    for(unsigned int i=0; i<avPVS[l].size(); i++)
-//      vIterationSet.push_back(avPVS[l][i]);  // Again, plonk all searched points onto the (maybe already populate) vIterationSet.
-//  };
+  int nFineRange = *gvdFineRange;  // Pixel search range for the fine stage.
+  if (mbDidCoarse)      // Can use a tighter search if the coarse stage was already done.
+    nFineRange = *gvdFineRangeAndCoarse;
 
-//  // All the others levels: Initially, put all remaining potentially visible patches onto vNextToSearch.
-//  vNextToSearch.clear();
-//  for(int l=LEVELS - 2; l>=0; l--)
-//    for(unsigned int i=0; i<avPVS[l].size(); i++)
-//      vNextToSearch.push_back(avPVS[l][i]);
+// What patches shall we use this time? The high-level ones are quite important,
+// so do all of these, with sub-pixel refinement.
+  {
+    int l = LEVELS - 1;
+    for (unsigned int i = 0; i < avPVS[l].size(); i++)
+      avPVS[l][i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
+    SearchForPoints(avPVS[l], nFineRange, 8);
+    for (unsigned int i = 0; i < avPVS[l].size(); i++)
+      vIterationSet.push_back(avPVS[l][i]);  // Again, plonk all searched points onto the (maybe already populate) vIterationSet.
+  };
 
-//  // But we haven't got CPU to track _all_ patches in the map - arbitrarily limit
-//  // ourselves to 1000, and choose these randomly.
-//    static gvar3<int> gvnMaxPatchesPerFrame("Tracker.MaxPatchesPerFrame", 1000, SILENT);
-//    int nFinePatchesToUse = *gvnMaxPatchesPerFrame - vIterationSet.size();
-//    if(nFinePatchesToUse < 0)
-//      nFinePatchesToUse = 0;
-//    if((int) vNextToSearch.size() > nFinePatchesToUse)
-//    {
-//      random_shuffle(vNextToSearch.begin(), vNextToSearch.end());
-//      vNextToSearch.resize(nFinePatchesToUse); // Chop!
-//    };
+// All the others levels: Initially, put all remaining potentially visible patches onto vNextToSearch.
+  vNextToSearch.clear();
+  for (int l = LEVELS - 2; l >= 0; l--)
+    for (unsigned int i = 0; i < avPVS[l].size(); i++)
+      vNextToSearch.push_back(avPVS[l][i]);
 
-//  // If we did a coarse tracking stage: re-project and find derivs of fine points
-//    if(mbDidCoarse)
-//      for(unsigned int i=0; i<vNextToSearch.size(); i++)
-//        vNextToSearch[i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
+// But we haven't got CPU to track _all_ patches in the map - arbitrarily limit
+// ourselves to 1000, and choose these randomly.
+  static gvar3<int> gvnMaxPatchesPerFrame("Tracker.MaxPatchesPerFrame", 1000, SILENT);
+  int nFinePatchesToUse = *gvnMaxPatchesPerFrame - vIterationSet.size();
+  if (nFinePatchesToUse < 0)
+    nFinePatchesToUse = 0;
+  if ((int) vNextToSearch.size() > nFinePatchesToUse)
+  {
+    random_shuffle(vNextToSearch.begin(), vNextToSearch.end());
+    vNextToSearch.resize(nFinePatchesToUse); // Chop!
+  };
 
-//  // Find fine points in image:
-//      SearchForPoints(vNextToSearch, nFineRange, 0);
-//  // And attach them all to the end of the optimisation-set.
-//      for(unsigned int i=0; i<vNextToSearch.size(); i++)
-//        vIterationSet.push_back(vNextToSearch[i]);
+// If we did a coarse tracking stage: re-project and find derivs of fine points
+  if (mbDidCoarse)
+    for (unsigned int i = 0; i < vNextToSearch.size(); i++)
+      vNextToSearch[i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
 
-//  // Again, ten gauss-newton pose update iterations.
-//      Vector<6> v6LastUpdate;
-//      v6LastUpdate = Zeros;
-//      for(int iter = 0; iter<10; iter++)
-//      {
-//      bool bNonLinearIteration; // For a bit of time-saving: don't do full nonlinear
-//                                // reprojection at every iteration - it really isn't necessary!
-//      if(iter == 0 || iter == 4 || iter == 9)
-  // bNonLinearIteration = true;   // Even this is probably overkill, the reason we do many
-//      else                            // iterations is for M-Estimator convergence rather than
-  // bNonLinearIteration = false;  // linearisation effects.
+// Find fine points in image:
+  SearchForPoints(vNextToSearch, nFineRange, 0);
+// And attach them all to the end of the optimisation-set.
+  for (unsigned int i = 0; i < vNextToSearch.size(); i++)
+    vIterationSet.push_back(vNextToSearch[i]);
 
-//      if(iter != 0)   // Either way: first iteration doesn't need projection update.
-//      {
-//       if(bNonLinearIteration)
-//       {
-//         for(unsigned int i=0; i<vIterationSet.size(); i++)
-//          if(vIterationSet[i]->bFound)
-//            vIterationSet[i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
-//        }
-//        else
-//        {
-//         for(unsigned int i=0; i<vIterationSet.size(); i++)
-//          if(vIterationSet[i]->bFound)
-//            vIterationSet[i]->LinearUpdate(v6LastUpdate);
-//        };
-//      }
+// Again, ten gauss-newton pose update iterations.
+  Vector<6> v6LastUpdate;
+  v6LastUpdate = Zeros;
+  for (int iter = 0; iter < 10; iter++)
+  {
+    bool bNonLinearIteration; // For a bit of time-saving: don't do full nonlinear
+    // reprojection at every iteration - it really isn't necessary!
+    if (iter == 0 || iter == 4 || iter == 9)
+      bNonLinearIteration = true;   // Even this is probably overkill, the reason we do many
+    else                            // iterations is for M-Estimator convergence rather than
+      bNonLinearIteration = false;  // linearisation effects.
 
-//      if(bNonLinearIteration)
-//       for(unsigned int i=0; i<vIterationSet.size(); i++)
-//         if(vIterationSet[i]->bFound)
-//           vIterationSet[i]->CalcJacobian();
+    if (iter != 0)  // Either way: first iteration doesn't need projection update.
+    {
+      if (bNonLinearIteration)
+      {
+        for (unsigned int i = 0; i < vIterationSet.size(); i++)
+          if (vIterationSet[i]->bFound)
+            vIterationSet[i]->ProjectAndDerivs(mse3CamFromWorld, mCamera);
+      }
+      else
+      {
+        for (unsigned int i = 0; i < vIterationSet.size(); i++)
+          if (vIterationSet[i]->bFound)
+            vIterationSet[i]->LinearUpdate(v6LastUpdate);
+      };
+    }
 
-//      // Again, an M-Estimator hack beyond the fifth iteration.
-//         double dOverrideSigma = 0.0;
-//         if(iter > 5)
-//           dOverrideSigma = 16.0;
+    if (bNonLinearIteration)
+      for (unsigned int i = 0; i < vIterationSet.size(); i++)
+        if (vIterationSet[i]->bFound)
+          vIterationSet[i]->CalcJacobian();
 
-//      // Calculate and update pose; also store update vector for linear iteration updates.
-//         Vector<6> v6Update =
-//         CalcPoseUpdate(vIterationSet, dOverrideSigma, iter==9);
-//         mse3CamFromWorld = SE3<>::exp(v6Update) * mse3CamFromWorld;
-//         v6LastUpdate = v6Update;
-//       };
+    // Again, an M-Estimator hack beyond the fifth iteration.
+    double dOverrideSigma = 0.0;
+    if (iter > 5)
+      dOverrideSigma = 16.0;
 
-//       if(mbDraw)
-//       {
-//        glPointSize(6);
-//        glEnable(GL_BLEND);
-//        glEnable(GL_POINT_SMOOTH);
-//        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//        glBegin(GL_POINTS);
-//        for(vector<TrackerData*>::reverse_iterator it = vIterationSet.rbegin();
-//         it!= vIterationSet.rend();
-//         it++)
-//        {
-//         if(! (*it)->bFound)
-//           continue;
-//         glColor(gavLevelColors[(*it)->nSearchLevel]);
-//         glVertex((*it)->v2Image);
-//       }
-//       glEnd();
-//       glDisable(GL_BLEND);
-//     }
+    // Calculate and update pose; also store update vector for linear iteration updates.
+    Vector<6> v6Update =
+      CalcPoseUpdate(vIterationSet, dOverrideSigma, iter == 9);
+    mse3CamFromWorld = SE3<>::exp(v6Update) * mse3CamFromWorld;
+    v6LastUpdate = v6Update;
+  };
 
-//  // Update the current keyframe with info on what was found in the frame.
-//  // Strictly speaking this is unnecessary to do every frame, it'll only be
-//  // needed if the KF gets added to MapMaker. Do it anyway.
-//  // Export pose to current keyframe:
-//     mCurrentKF.se3CfromW = mse3CamFromWorld;
+  if (mbDraw)
+  {
+    glPointSize(6);
+    glEnable(GL_BLEND);
+    glEnable(GL_POINT_SMOOTH);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBegin(GL_POINTS);
+    for (vector<TrackerData*>::reverse_iterator it = vIterationSet.rbegin();
+         it != vIterationSet.rend();
+         it++)
+    {
+      if (! (*it)->bFound)
+        continue;
+      glColor(gavLevelColors[(*it)->nSearchLevel]);
+      glVertex((*it)->v2Image);
+    }
+    glEnd();
+    glDisable(GL_BLEND);
+  }
 
-//  // Record successful measurements. Use the KeyFrame-Measurement struct for this.
-//     mCurrentKF.mMeasurements.clear();
-//     for(vector<TrackerData*>::iterator it = vIterationSet.begin();
-//      it!= vIterationSet.end();
-//      it++)
-//     {
-//      if(! (*it)->bFound)
-//       continue;
-//     Measurement m;
-//     m.v2RootPos = (*it)->v2Found;
-//     m.nLevel = (*it)->nSearchLevel;
-//     m.bSubPix = (*it)->bDidSubPix;
-//     mCurrentKF.mMeasurements[& ((*it)->Point)] = m;
-//   }
+// Update the current keyframe with info on what was found in the frame.
+// Strictly speaking this is unnecessary to do every frame, it'll only be
+// needed if the KF gets added to MapMaker. Do it anyway.
+// Export pose to current keyframe:
+  mCurrentKF.se3CfromW = mse3CamFromWorld;
 
-//  // Finally, find the mean scene depth from tracked features
-//   {
-//    double dSum = 0;
-//    double dSumSq = 0;
-//    int nNum = 0;
-//    for(vector<TrackerData*>::iterator it = vIterationSet.begin();
-//     it!= vIterationSet.end();
-//     it++)
-//      if((*it)->bFound)
-//      {
-//       double z = (*it)->v3Cam[2];
-//       dSum+= z;
-//       dSumSq+= z*z;
-//       nNum++;
-//     };
-//     if(nNum > 20)
-//     {
-//       mCurrentKF.dSceneDepthMean = dSum/nNum;
-//       mCurrentKF.dSceneDepthSigma = sqrt((dSumSq / nNum) - (mCurrentKF.dSceneDepthMean) * (mCurrentKF.dSceneDepthMean));
-//     }
-//   }
+// Record successful measurements. Use the KeyFrame-Measurement struct for this.
+  mCurrentKF.mMeasurements.clear();
+  for (vector<TrackerData*>::iterator it = vIterationSet.begin();
+       it != vIterationSet.end();
+       it++)
+  {
+    if (! (*it)->bFound)
+      continue;
+    Measurement m;
+    m.v2RootPos = (*it)->v2Found;
+    m.nLevel = (*it)->nSearchLevel;
+    m.bSubPix = (*it)->bDidSubPix;
+    mCurrentKF.mMeasurements[& ((*it)->Point)] = m;
+  }
+
+// Finally, find the mean scene depth from tracked features
+  {
+    double dSum = 0;
+    double dSumSq = 0;
+    int nNum = 0;
+    for (vector<TrackerData*>::iterator it = vIterationSet.begin();
+         it != vIterationSet.end();
+         it++)
+      if ((*it)->bFound)
+      {
+        double z = (*it)->v3Cam[2];
+        dSum += z;
+        dSumSq += z * z;
+        nNum++;
+      };
+    if (nNum > 20)
+    {
+      mCurrentKF.dSceneDepthMean = dSum / nNum;
+      mCurrentKF.dSceneDepthSigma = sqrt((dSumSq / nNum) - (mCurrentKF.dSceneDepthMean) * (mCurrentKF.dSceneDepthMean));
+    }
+  }
 }
 
 // Find points in the image. Uses the PatchFiner struct stored in TrackerData
@@ -788,65 +790,67 @@ int Tracker::SearchForPoints(vector<TrackerData*> &vTD, int nRange, int nSubPixI
   // //if descriptor not cache need to build descriptor and see if one matching in the surroundings
 
   int nFound = 0;
-  // for(unsigned int i=0; i<vTD.size(); i++)   // for each point..
-  // {
-  //   // First, attempt a search at pixel locations which are FAST corners.
+  for (unsigned int i = 0; i < vTD.size(); i++) // for each point..
+  {
+    // First, attempt a search at pixel locations which are FAST corners.
 
-  //   TrackerData &TD = *vTD[i];
-  //   PatchFinder &Finder = TD.Finder;
+    TrackerData &TD = *vTD[i];
+    manMeasAttempted[TD.nSearchLevel]++;  // Stats for tracking quality assessmenta
 
-  //   //warp patch (need to be our descriptor now)
-  //   Finder.MakeTemplateCoarseCont(TD.Point);
-  //   if(Finder.TemplateBad())
-  //   {
-  //     TD.bInImage = TD.bPotentiallyVisible = TD.bFound = false;
-  //     continue;
-  //   }
+    static gvar3<int> gvnMaxHamming("Tracker.MaxHammingDistance", 100, SILENT);
+    //try to match current trail with descriptor in new frame
+    static MatchFinder finder = MatchFinder(*gvnMaxHamming);
+    //Create feature with map point descriptor and projected location on current image.
+    Feature ftOrigin;
+    ftOrigin.ptRootPos=Point2f(TD.v2Image);
+    ftOrigin.descriptor=TD.Point.descriptor;
 
-  //   manMeasAttempted[Finder.GetLevel()]++;  // Stats for tracking quality assessmenta
+    //try to find a match
+    Feature *ftNew;
+    bool bFound = finder.FindMatchCoarse(mCurrentKF, ftOrigin, ftNew, TD.nSearchLevel, nRange);
 
-  //   //try to get a match
-  //   bool bFound= Finder.FindPatchCoarse(ir(TD.v2Image), mCurrentKF, nRange);
+    TD.bSearched = true;
+    if (!bFound)
+    {
+      TD.bFound = false;
+      continue;
+    }
 
-  //   TD.bSearched = true;
-  //   if(!bFound)
-  //   {
-  //     TD.bFound = false;
-  //     continue;
-  //   }
+    TD.bFound = true;
+    TD.dSqrtInvNoise = (1.0 / mCurrentKF.pyramid[TD.nSearchLevel].scale);
 
-  //   TD.bFound = true;
-  //   TD.dSqrtInvNoise = (1.0 / Finder.GetLevelScale());
+    nFound++;
+    manMeasFound[TD.nSearchLevel]++;
 
-  //   nFound++;
-  //   manMeasFound[Finder.GetLevel()]++;
+    //don't need subpix since brisk scale space does it. 
+    TD.v2Found=ftNew->ptRootPos.vec();
+    TD.bDidSubPix=true;
 
-  //   //Need to check if subpixel still needed if so do it.
+    // //Need to check if subpixel still needed if so do it.
+    // // Found the patch in coarse search - are Sub-pixel iterations wanted too?
+    // if (nSubPixIts > 0)
+    // {
+    //   TD.bDidSubPix = true;
+    //   Finder.MakeSubPixTemplate();
+    //   bool bSubPixConverges = Finder.IterateSubPixToConvergence(mCurrentKF, nSubPixIts);
+    //   if (!bSubPixConverges)
+    //   { // If subpix doesn't converge, the patch location is probably very dubious!
+    //     TD.bFound = false;
+    //     nFound--;
+    //     manMeasFound[Finder.GetLevel()]--;
+    //     continue;
+    //   }
+    //   TD.v2Found = Finder.GetSubPixPos();
+    // }
+    // else
+    // {
+    //   TD.v2Found = Finder.GetCoarsePosAsVector();
+    //   TD.bDidSubPix = false;
+    // }
 
-  //   // Found the patch in coarse search - are Sub-pixel iterations wanted too?
-  //   if(nSubPixIts > 0)
-  //   {
-  //     TD.bDidSubPix = true;
-  //     Finder.MakeSubPixTemplate();
-  //     bool bSubPixConverges=Finder.IterateSubPixToConvergence(mCurrentKF, nSubPixIts);
-  //     if(!bSubPixConverges)
-  //    { // If subpix doesn't converge, the patch location is probably very dubious!
-  //       TD.bFound = false;
-  //       nFound--;
-  //       manMeasFound[Finder.GetLevel()]--;
-  //       continue;
-  //     }
-  //     TD.v2Found = Finder.GetSubPixPos();
-  //   }
-  //   else
-  //   {
-  //     TD.v2Found = Finder.GetCoarsePosAsVector();
-  //     TD.bDidSubPix = false;
-  //   }
+    //end subpix refinement
 
-  //   //end subpix refinement
-
-  // }
+  }
   return nFound;
 };
 
