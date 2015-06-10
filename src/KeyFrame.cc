@@ -20,14 +20,6 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
   // e.g. does not perform FAST nonmax suppression. Things like that which are needed by the
   // mapmaker but not the tracker go in MakeKeyFrame_Rest();
 
-  //Get Brisk Corners
-  std::vector<KeyPoint> keypoints;
-  BriskScaleSpace briskScaleSpace(2);
-  briskScaleSpace.constructPyramid(im);
-  //Value of keypoints needs to be tuned based on environment.
-  //10-15 in lab >60 for ants so far.
-  briskScaleSpace.getKeypoints(15, keypoints);
-
   // First, copy out the image data to the pyramid's zero level.
   aLevels[0].im.resize(im.size());
   copy(im, aLevels[0].im);
@@ -39,28 +31,12 @@ void KeyFrame::MakeKeyFrame_Lite(Image<byte> &im)
     Level &lev = aLevels[i];
     if (i != 0)
     { //Get From brisk Layer
-      lev.im.resize(briskScaleSpace.getPyramid()[i].img().size());
-      copy(briskScaleSpace.getPyramid()[i].img(), lev.im);
-      // lev.im.resize(aLevels[i-1].im.size() / 2);
-      // halfSample(aLevels[i-1].im, lev.im);
+      lev.im.resize(aLevels[i - 1].im.size() / 2);
+      halfSample(aLevels[i - 1].im, lev.im);
     }
-
-    lev.scale = briskScaleSpace.getPyramid()[i].scale();
-    lev.offset = briskScaleSpace.getPyramid()[i].offset();
     lev.vCorners.clear();
-    lev.vCandidates.clear();
     lev.vMaxCorners.clear();
-  }
-
-  //fill corners
-  for (unsigned int i = 0; i < keypoints.size(); i++) {
-    // if(keypoints[i].octave==0)
-    Level &lev = aLevels[keypoints[i].octave];
-
-    CVD::Point2f lvlNPos = LevelNPos(keypoints[i].pt,lev.scale, lev.offset);
-    ImageRef imNPos=ImageRef(lvlNPos.x, lvlNPos.y);
-    lev.vCorners.push_back(imNPos);
-    lev.vMaxCorners.push_back(imNPos);
+    fast_corner_detect_10(lev.im, lev.vCorners, 10);//10
   }
 
   //add index
@@ -91,6 +67,8 @@ void KeyFrame::MakeKeyFrame_Rest()
   for (int l = 0; l < LEVELS; l++)
   {
     Level &lev = aLevels[l];
+    lev.vCandidates.clear();
+    fast_nonmax(lev.im, lev.vCorners, 30, lev.vMaxCorners);
     // .. and then calculate the Shi-Tomasi scores of those, and keep the ones with
     // a suitably high score as Candidates, i.e. points which the mapmaker will attempt
     // to make new map points out of.
